@@ -140,7 +140,8 @@ class TestGeneralTab:
     def test_it_opens_showing_the_current_settings(self, dialog: SettingsDialog) -> None:
         assert dialog._language.currentData() == "en"
         assert dialog._notifications.isChecked() is True
-        assert dialog._single_icon.isChecked() is False
+        assert dialog._one_icon.isChecked() is False
+        assert dialog._per_manga.isChecked() is True
 
     def test_turning_notifications_off_is_reported(self, dialog: SettingsDialog) -> None:
         seen = Recorder()
@@ -180,7 +181,7 @@ class TestGeneralTab:
         dialog.settings_changed.connect(seen)
 
         dialog._notifications.setChecked(False)
-        dialog._single_icon.setChecked(True)
+        dialog._one_icon.setChecked(True)
 
         assert isinstance(seen.last, Settings)
         assert seen.last.single_tray_icon is True
@@ -216,6 +217,107 @@ class TestGeneralTab:
         widget = SettingsDialog(Translator("de"), settings().model_copy(update={"language": "de"}))
         assert widget.windowTitle() == "mangame-Einstellungen"
         assert widget._language.currentData() == "de"
+
+
+class TestTrayMode:
+    """Choosing between one icon for everything and one icon per manga.
+
+    This is a choice between two pictures of your library, not a feature to
+    switch on, so it is a pair of radios rather than a checkbox -- and the
+    emblem the aggregate icon wears hangs off the option it belongs to.
+    """
+
+    def test_the_emblem_picker_only_applies_to_the_aggregate_icon(
+        self, dialog: SettingsDialog
+    ) -> None:
+        # A control that cannot apply says so by being unavailable, rather
+        # than by being explained in a sentence nobody reads.
+        assert dialog._per_manga.isChecked() is True
+        assert dialog._tray_emblem.isEnabled() is False
+
+        dialog._one_icon.setChecked(True)
+        assert dialog._tray_emblem.isEnabled() is True
+
+        dialog._per_manga.setChecked(True)
+        assert dialog._tray_emblem.isEnabled() is False
+
+    def test_choosing_one_icon_for_everything_is_reported_once(
+        self, dialog: SettingsDialog
+    ) -> None:
+        # Both radios move on every click; reacting to both would save twice.
+        seen = Recorder()
+        dialog.settings_changed.connect(seen)
+
+        dialog._one_icon.setChecked(True)
+
+        assert len(seen.calls) == 1
+        assert isinstance(seen.last, Settings)
+        assert seen.last.single_tray_icon is True
+
+    def test_choosing_one_icon_per_manga_is_reported_once(self, dialog: SettingsDialog) -> None:
+        dialog.set_settings(settings().model_copy(update={"single_tray_icon": True}))
+        seen = Recorder()
+        dialog.settings_changed.connect(seen)
+
+        dialog._per_manga.setChecked(True)
+
+        assert len(seen.calls) == 1
+        assert isinstance(seen.last, Settings)
+        assert seen.last.single_tray_icon is False
+
+    def test_choosing_an_emblem_for_it_is_reported(self, dialog: SettingsDialog) -> None:
+        seen = Recorder()
+        dialog.settings_changed.connect(seen)
+
+        dialog._tray_emblem.setCurrentIndex(dialog._tray_emblem.findData("book"))
+
+        assert isinstance(seen.last, Settings)
+        assert seen.last.tray_emblem == "book"
+
+    def test_the_picker_shows_what_each_emblem_looks_like(self, dialog: SettingsDialog) -> None:
+        for row in range(dialog._tray_emblem.count()):
+            assert not dialog._tray_emblem.itemIcon(row).isNull()
+
+    def test_it_offers_the_app_mark_and_the_installed_artwork(self, dialog: SettingsDialog) -> None:
+        offered = {dialog._tray_emblem.itemData(i) for i in range(dialog._tray_emblem.count())}
+        assert {"mangame", "onepiece", "book"} <= offered
+
+    def test_it_does_not_offer_the_monogram(self, dialog: SettingsDialog) -> None:
+        # A monogram takes its letter and its hue from one series' title, and
+        # the aggregate icon stands for all of them.
+        offered = {dialog._tray_emblem.itemData(i) for i in range(dialog._tray_emblem.count())}
+        assert emblems.MONOGRAM_EMBLEM not in offered
+
+    def test_but_it_keeps_a_stored_choice_it_would_not_have_offered(
+        self, dialog: SettingsDialog
+    ) -> None:
+        # Never silently rewrite what someone already chose.
+        stored = emblems.MONOGRAM_EMBLEM
+        dialog.set_settings(settings().model_copy(update={"tray_emblem": stored}))
+
+        assert dialog._tray_emblem.currentData() == stored
+
+    def test_imported_artwork_can_be_chosen_for_it(
+        self, dialog: SettingsDialog, emblem_home: Path, tmp_path: Path
+    ) -> None:
+        artwork.install(picture(tmp_path / "crest.png"), "crest")
+        dialog.set_settings(settings())
+
+        offered = {dialog._tray_emblem.itemData(i) for i in range(dialog._tray_emblem.count())}
+        assert "crest" in offered
+
+    def test_being_handed_new_settings_is_not_an_edit(self, dialog: SettingsDialog) -> None:
+        seen = Recorder()
+        dialog.settings_changed.connect(seen)
+
+        dialog.set_settings(
+            settings().model_copy(update={"single_tray_icon": True, "tray_emblem": "book"})
+        )
+
+        assert dialog._one_icon.isChecked() is True
+        assert dialog._tray_emblem.currentData() == "book"
+        assert dialog._tray_emblem.isEnabled() is True
+        assert seen.calls == []
 
 
 class TestMangaTab:
@@ -557,6 +659,7 @@ class TestFlatLayout:
         assert dialog.findChildren(QGroupBox) == []
         titles = {label.text() for label in dialog.findChildren(QLabel) if label.font().bold()}
         assert titles == {
+            dialog._t("dialog.settings.tray.heading"),
             dialog._t("dialog.settings.art.preview"),
             dialog._t("dialog.settings.art.yours"),
         }

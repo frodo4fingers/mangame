@@ -2,9 +2,12 @@
 
 import re
 from pathlib import Path
+from statistics import mean, median
+from typing import ClassVar
 
 import pytest
 from PySide6.QtCore import QPoint, QRect
+from PySide6.QtGui import QColor, QImage
 
 from mangame.domain.models import IconState
 from mangame.i18n.catalog import _CATALOGS, _EN, LANGUAGES, Translator, available
@@ -74,21 +77,27 @@ class TestTranslator:
         assert Translator(tag)("menu.quit") == _EN["menu.quit"]
 
 
-class TestEmblems:
-    def test_the_bundled_artwork_is_shipped(self) -> None:
-        assert "onepiece" in emblems.available_emblems()
-        assert "book" in emblems.available_emblems()
+#: Every emblem shipped in the package. "mangame" is the app's own mark, worn
+#: by the aggregate icon; the other two are series artwork.
+BUNDLED = ["onepiece", "book", "mangame"]
 
-    @pytest.mark.parametrize("emblem", ["onepiece", "book"])
+
+class TestEmblems:
+    @pytest.mark.parametrize("emblem", BUNDLED)
+    def test_the_bundled_artwork_is_shipped(self, emblem: str) -> None:
+        assert emblem in emblems.available_emblems()
+
+    @pytest.mark.parametrize("emblem", BUNDLED)
     @pytest.mark.parametrize("state", list(IconState))
     def test_every_emblem_has_artwork_for_every_state(self, emblem: str, state: IconState) -> None:
         found = emblems._find(emblem, state)
         assert found is not None, f"{emblem}/{state.value} has no artwork"
         assert found.is_dir() or found.is_file()
 
-    def test_bundled_artwork_covers_the_sizes_a_panel_may_ask_for(self) -> None:
+    @pytest.mark.parametrize("emblem", BUNDLED)
+    def test_bundled_artwork_covers_the_sizes_a_panel_may_ask_for(self, emblem: str) -> None:
         for state in IconState:
-            directory = emblems.BUNDLED_DIR / "onepiece" / state.value
+            directory = emblems.BUNDLED_DIR / emblem / state.value
             present = {int(p.stem) for p in directory.glob("*.png") if p.stem.isdigit()}
             assert set(emblems.SIZES) <= present
 
@@ -99,6 +108,75 @@ class TestEmblems:
     def test_the_monogram_is_not_offered_as_artwork(self) -> None:
         assert emblems.MONOGRAM_EMBLEM not in emblems.available_emblems()
         assert emblems.selectable_emblems()[0] == emblems.MONOGRAM_EMBLEM
+
+
+class TestAppMark:
+    """The app's own icon has to carry the same three states a series does.
+
+    That is the whole point of it: the tray says "something is ready" the same
+    way whether it is showing one manga or standing in for thirty. So rather
+    than pin the mark to invented numbers, every assertion here measures it
+    against the series artwork that has always been on the panel.
+    """
+
+    #: The artwork the app mark has to hold its own next to.
+    SERIES: ClassVar[list[str]] = ["onepiece", "book"]
+
+    @staticmethod
+    def _pixels(emblem: str, state: IconState, size: int = 22) -> list[QColor]:
+        image = QImage(str(emblems.BUNDLED_DIR / emblem / state.value / f"{size}.png"))
+        found = [
+            image.pixelColor(x, y)
+            for y in range(image.height())
+            for x in range(image.width())
+            if image.pixelColor(x, y).alpha() > 200
+        ]
+        assert found, f"{emblem}/{state.value} rendered nothing"
+        return found
+
+    @classmethod
+    def _colour(cls, emblem: str, state: IconState) -> float:
+        pixels = cls._pixels(emblem, state)
+        return mean(c.saturationF() for c in pixels)
+
+    @classmethod
+    def _body(cls, emblem: str, state: IconState) -> float:
+        """Median lightness — the mark's body, not its outline.
+
+        The break state is a dark silhouette wearing a light rim, so its *mean*
+        lightness says nothing: on a thin shape the rim outweighs the body and
+        the average lands in the middle.
+        """
+        return median(c.lightnessF() for c in cls._pixels(emblem, state))
+
+    def test_ready_is_the_only_state_with_colour(self) -> None:
+        ready = self._colour("mangame", IconState.READY)
+        assert ready >= min(self._colour(e, IconState.READY) for e in self.SERIES)
+        assert self._colour("mangame", IconState.DUE) == 0.0
+        assert self._colour("mangame", IconState.BREAK) == 0.0
+
+    def test_the_states_get_darker_as_the_news_gets_worse(self) -> None:
+        due = self._body("mangame", IconState.DUE)
+        assert self._body("mangame", IconState.READY) < due
+        assert self._body("mangame", IconState.BREAK) < due
+
+    @pytest.mark.parametrize("state", list(IconState))
+    def test_its_body_is_as_dark_as_the_series_artwork(self, state: IconState) -> None:
+        # A letter has far less area per unit of outline than a hat or a book,
+        # so an outline sized for those turns the mark into a line drawing
+        # instead of a silhouette. This is what catches that.
+        series = [self._body(e, state) for e in self.SERIES]
+        assert self._body("mangame", state) <= max(series) + 0.05
+
+    def test_the_break_silhouette_keeps_a_light_rim(self) -> None:
+        # Without it a near-black mark disappears on a dark panel.
+        lightest = max(c.lightnessF() for c in self._pixels("mangame", IconState.BREAK, 64))
+        assert lightest > 0.7
+
+    def test_it_is_not_the_same_picture_as_a_series_emblem(self) -> None:
+        mark = QImage(str(emblems.BUNDLED_DIR / "mangame" / "ready" / "64.png"))
+        for other in self.SERIES:
+            assert mark != QImage(str(emblems.BUNDLED_DIR / other / "ready" / "64.png"))
 
 
 class TestMonogramFallback:

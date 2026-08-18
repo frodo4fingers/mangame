@@ -334,3 +334,42 @@
   does not invalidate that narrowing.
 - **Rule**: For before/after assertions on a property, capture both into locals
   and compare the pair. It type-checks, and it reads better.
+
+### An aggregate must not look like a member of the set
+- **What**: One icon for the whole library wore One Piece's straw hat, because
+  that was the nicest emblem available when the mode was written.
+- **Why**: A summary that borrows one member's identity misreports what it is
+  summarising, and does so most badly for the users with the most series.
+- **Rule**: When a UI element stands for many things, give it its own mark.
+  Letters and abstract shapes can do that; pictures of one of the things cannot.
+
+### Measure new artwork against the artwork already shipping
+- **What**: A new emblem looked right beside the others and was statistically
+  nowhere near them: its break state was 39% dark pixels where the existing two
+  are 59% and 66%, because a thin glyph is mostly outline.
+- **Why**: The eye grades a picture on its own terms; the panel shows it next
+  to the others at 16px, where only the gross statistics survive.
+- **Rule**: Reduce artwork to a few numbers (median lightness, mean saturation,
+  dark fraction) and compare against the existing set. Then write the test as
+  that comparison, so the threshold moves with the family instead of being a
+  number someone typed once.
+
+### paint-order is how a filled glyph keeps a rim without losing its body
+- **What**: A centred stroke eats half its width into the fill. On a bulky
+  shape that is nothing; on a letterform it hollows the mark out.
+- **Why**: Visible rim width and solid body are both wanted, and a centred
+  stroke trades one for the other.
+- **Rule**: `paint-order="stroke fill"` paints the outline behind the fill, so
+  it only shows outside. Double the stroke width to keep the visible rim the
+  same.
+
+### Do not script a block replacement across a boundary you have not re-read
+- **What**: A `str.replace` that inserted a new test class ended at the wrong
+  place and silently deleted two existing tests. Only `ruff` noticing a
+  now-unused import gave it away.
+- **Why**: The replaced text was written from memory of the file, not from a
+  fresh read, and a passing test run cannot notice tests that no longer exist.
+- **Rule**: View the exact region first, and anchor a replacement on both its
+  start *and* its end. Afterwards, check the test count went up by what you
+  added — this is the second time this session that a blind edit destroyed
+  working code.

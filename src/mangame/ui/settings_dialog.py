@@ -31,6 +31,7 @@ from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtGui import QColor, QImage, QPainter, QPixmap
 from PySide6.QtWidgets import (
     QAbstractItemView,
+    QButtonGroup,
     QCheckBox,
     QComboBox,
     QDialog,
@@ -45,6 +46,8 @@ from PySide6.QtWidgets import (
     QListWidget,
     QListWidgetItem,
     QPushButton,
+    QRadioButton,
+    QStyle,
     QTableWidget,
     QTableWidgetItem,
     QTabWidget,
@@ -74,6 +77,11 @@ PREVIEW_HEIGHT = PREVIEW_ICON + 2 * PREVIEW_PAD
 
 #: Slack around an emblem picker so its longest entry is never clipped.
 COMBO_MARGIN = 16
+
+#: Stands in for a series title where the icon speaks for the whole library.
+#: Only reached if a monogram is ever chosen for the aggregate icon, which the
+#: picker does not offer.
+APP_TITLE = "mangame"
 
 #: Content insets. Three of them used to stack — the dialog's own layout, the
 #: tab pane's frame and each page's layout — putting 24px between a control and
@@ -308,9 +316,6 @@ class SettingsDialog(QDialog):
         self._notifications = QCheckBox(self._t("dialog.settings.notifications"), page)
         self._notifications.toggled.connect(lambda checked: self._change(notifications=checked))
 
-        self._single_icon = QCheckBox(self._t("dialog.settings.single_icon"), page)
-        self._single_icon.toggled.connect(lambda checked: self._change(single_tray_icon=checked))
-
         self._autostart = QCheckBox(self._t("menu.autostart"), page)
 
         hint = QLabel(self._t("dialog.settings.language_hint"), page)
@@ -322,10 +327,61 @@ class SettingsDialog(QDialog):
         form.setSpacing(PAGE_SPACING)
         form.addRow(self._t("dialog.settings.language"), self._language)
         form.addRow("", hint)
+        form.addRow(self._build_tray_mode(page))
         form.addRow(self._notifications)
-        form.addRow(self._single_icon)
         form.addRow(self._autostart)
         return page
+
+    def _build_tray_mode(self, page: QWidget) -> QWidget:
+        """How the library is represented in the tray, and by what.
+
+        The two modes are radio buttons rather than one checkbox because they
+        are a choice between two pictures of your library, not a feature to
+        switch on. The emblem picker sits *on* the one-icon row and greys out
+        with it: which emblem the aggregate wears is meaningless when every
+        manga is drawing its own, and a control that cannot apply should say so
+        by being unavailable rather than by being explained.
+        """
+        box = QWidget(page)
+
+        self._one_icon = QRadioButton(self._t("dialog.settings.tray.one"), box)
+        self._per_manga = QRadioButton(self._t("dialog.settings.tray.each"), box)
+        self._tray_mode = QButtonGroup(box)
+        self._tray_mode.addButton(self._one_icon)
+        self._tray_mode.addButton(self._per_manga)
+        # One connection covers both directions: selecting either button
+        # toggles the other, so listening to both would write twice.
+        self._one_icon.toggled.connect(self._on_tray_mode)
+
+        self._tray_emblem = QComboBox(box)
+        self._tray_emblem.setIconSize(QSize(20, 20))
+        self._tray_emblem.currentIndexChanged.connect(self._on_tray_emblem)
+
+        hint = QLabel(self._t("dialog.settings.tray.each_hint"), box)
+        hint.setWordWrap(True)
+        hint.setEnabled(False)
+        # Indented to the radio's *label*, not its bullet, so it reads as
+        # belonging to that option rather than to the group. Measured from the
+        # style, because the indicator is a different width on every platform.
+        indicator = self._per_manga.style().pixelMetric(
+            QStyle.PixelMetric.PM_ExclusiveIndicatorWidth, None, self._per_manga
+        )
+        hint.setContentsMargins(indicator + PAGE_SPACING, 0, 0, 0)
+
+        single_row = QHBoxLayout()
+        single_row.setSpacing(PAGE_SPACING)
+        single_row.addWidget(self._one_icon)
+        single_row.addWidget(self._tray_emblem)
+        single_row.addStretch(1)
+
+        column = QVBoxLayout(box)
+        column.setContentsMargins(0, PAGE_SPACING, 0, 0)
+        column.setSpacing(2)
+        column.addWidget(heading(self._t("dialog.settings.tray.heading"), box))
+        column.addLayout(single_row)
+        column.addWidget(self._per_manga)
+        column.addWidget(hint)
+        return box
 
     def _build_manga(self) -> QWidget:
         page = QWidget(self)
@@ -498,12 +554,36 @@ class SettingsDialog(QDialog):
             if index >= 0:
                 self._language.setCurrentIndex(index)
             self._notifications.setChecked(settings.notifications)
-            self._single_icon.setChecked(settings.single_tray_icon)
+            self._one_icon.setChecked(settings.single_tray_icon)
+            self._per_manga.setChecked(not settings.single_tray_icon)
+            self._tray_emblem.setEnabled(settings.single_tray_icon)
+            self._fill_tray_emblems(settings.tray_emblem)
             self._fill_series()
             self._fill_targets(self._target.currentData())
         finally:
             self._loading = False
         self.update_preview()
+
+    def _fill_tray_emblems(self, current: str) -> None:
+        """Offer every installed picture for the aggregate icon.
+
+        The monogram is left out: it derives its letter and its colour from a
+        series title, and the aggregate icon stands for all of them. It is kept
+        only if a config already names it, for the same reason a missing emblem
+        is — silently rewriting a stored choice is worse than showing it.
+        """
+        guard = self._loading
+        self._loading = True
+        try:
+            self._tray_emblem.clear()
+            for name in emblem_choices(current):
+                if name == emblems.MONOGRAM_EMBLEM and name != current:
+                    continue
+                icon = emblems.icon_for(name, IconState.READY, APP_TITLE)
+                self._tray_emblem.addItem(icon, self._emblem_label(name), name)
+            self._tray_emblem.setCurrentIndex(max(0, self._tray_emblem.findData(current)))
+        finally:
+            self._loading = guard
 
     def _fill_series(self) -> None:
         self._series.setRowCount(len(self._settings.series))
@@ -766,6 +846,16 @@ class SettingsDialog(QDialog):
         code = self._language.currentData()
         if isinstance(code, str):
             self._change(language=code)
+
+    def _on_tray_mode(self, single: bool) -> None:
+        """Switch between one icon for the library and one per manga."""
+        self._tray_emblem.setEnabled(single)
+        self._change(single_tray_icon=single)
+
+    def _on_tray_emblem(self, _index: int) -> None:
+        name = self._tray_emblem.currentData()
+        if isinstance(name, str):
+            self._change(tray_emblem=name)
 
     def _on_autostart(self, enabled: bool) -> None:
         if not self._loading:

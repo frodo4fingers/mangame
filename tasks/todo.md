@@ -339,3 +339,47 @@ then skipped the sources that could not serve the reading language anyway.
   of the app — would need building three times.
 - **Rendering fewer icon sizes.** `QIcon.addFile` is already lazy; twelve sizes
   cost ~11 kB, not twelve bitmaps. The claim was wrong before it was measured.
+
+## The app gets a mark of its own, and you choose which picture you get
+
+The aggregate tray icon wore One Piece's straw hat — hardcoded in
+`_render_single` — so a library of thirty titles looked like one of them.
+
+- [x] `tools/gen_icons.py` draws a third bundled emblem, `mangame`: a heavy M,
+      in the same three palettes as the hat and the book.
+- [x] `Settings.tray_emblem` points the aggregate icon at any installed emblem,
+      imported artwork included. Defaults to the M.
+- [x] The General tab's checkbox became a pair of radios — one icon for
+      everything, or one per manga — with the emblem picker on the first row,
+      greying out with it.
+- [x] Four new catalogue keys in all three languages; the German and Spanish
+      dialogs were rendered and checked for clipping.
+- [x] `tests/test_tray.py` is new: it builds a real tray against a throwaway
+      config and compares rasterised icons.
+
+### The M needed measuring, not looking at
+
+Drawn at the family's proportions it looked fine and was wrong. A letter has
+far less area per unit of outline than a hat, so the *break* state came out
+39% dark pixels against 59% (hat) and 66% (book) — an outline drawing where
+the others are silhouettes.
+
+| | ready | due | break |
+| --- | --- | --- | --- |
+| straw hat | median 0.51, sat 0.72 | 0.57, sat 0 | 0.14, 59% dark |
+| book | 0.48, sat 0.74 | 0.53, sat 0 | 0.14, 66% dark |
+| M, first cut | 0.29, sat 0.75 | 0.36, sat 0 | **0.51, 39% dark** |
+| M, shipped | 0.48, sat 0.74 | 0.53, sat 0 | 0.14, 67% dark |
+
+Fixed by fattening the stems and by `paint-order="stroke fill"`, which puts the
+outline behind the fill so only its outer half shows; the stroke is doubled to
+6 to keep the visible rim the width the family uses.
+
+### Verified
+
+- 459 tests, ruff and mypy clean on linux, win32 and darwin.
+- The three aggregate-icon tests fail against the previous commit, and the two
+  "reported once" tests fail if the second radio is also connected.
+- The real app, on the real config, screenshotted in the real panel: the M in
+  aggregate mode, two series icons in per-manga mode, and the book after
+  pointing `tray_emblem` at it.

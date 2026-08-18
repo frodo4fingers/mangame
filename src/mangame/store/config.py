@@ -71,6 +71,15 @@ class Settings(BaseModel):
     single_tray_icon: bool = False
     """Collapse every series into one aggregate icon instead of one each."""
 
+    tray_emblem: str = "mangame"
+    """Which emblem the aggregate icon wears.
+
+    Only consulted in single-icon mode: with one icon per manga, each series
+    already names its own. It defaults to the app's own mark rather than to a
+    series' artwork, because an icon that speaks for the whole library should
+    not look like one of the things in it.
+    """
+
     max_tray_icons: int = 8
     series: list[SeriesConfig] = Field(default_factory=list)
 

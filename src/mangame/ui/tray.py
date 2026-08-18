@@ -134,13 +134,17 @@ class MangameTray(QObject):
             self._destroy_icon(key)
 
     def _render_single(self, snapshots: list[SeriesSnapshot]) -> None:
-        """Fallback/aggregate mode: one hat that speaks for the whole library."""
+        """Aggregate mode: one icon that speaks for the whole library.
+
+        It wears its own emblem rather than any series', and shows the
+        aggregate state, so "something is ready" is still one glance.
+        """
         for key in set(self._icons) - {"__all__"}:
             self._destroy_icon(key)
 
         state = aggregate([s.icon_state for s in snapshots])
         icon = self._ensure_icon("__all__")
-        icon.setIcon(icon_for("onepiece", state, "mangame"))
+        icon.setIcon(icon_for(self._settings.tray_emblem, state, "mangame"))
         icon.setToolTip("\n".join(s.tooltip for s in snapshots) or self._t("menu.no_series"))
         icon.setContextMenu(self._build_menu(icon, None))
         icon.show()

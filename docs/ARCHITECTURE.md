@@ -213,6 +213,34 @@ generated badge still says which series it is; a shared stand-in would make
 every untouched series look identical — which is precisely the bug that
 existed while `"monogram"` silently resolved to the bundled `book`.
 
+### The aggregate icon has a mark of its own
+
+One icon for the whole library used to wear One Piece's straw hat, hardcoded,
+so a shelf of thirty titles looked like one of them. It now wears `mangame`, a
+letter M — the aggregate must not look like a member of the set it aggregates,
+which rules out every object and leaves a monogram.
+
+Not the *generated* monogram, though: that one takes its letter and its hue
+from a series title, and this icon stands for all of them. So the M is bundled
+artwork like the hat and the book, drawn by `tools/gen_icons.py` in the same
+three palettes, and `Settings.tray_emblem` may point at any installed emblem
+instead — including imported artwork.
+
+Two details are load-bearing, and both were found by measuring rather than by
+looking:
+
+- **The stems are fat.** A letter has far less area per unit of outline than a
+  hat or a book. Drawn at the family's proportions the *break* state — a dark
+  body with a light rim — came out only 39% dark pixels against 59% and 66%
+  for the other two: an outline drawing, not a silhouette.
+- **`paint-order="stroke fill"`** puts the outline behind the fill, so only its
+  outer half shows and the body stays solid. The stroke is doubled to 6 to
+  keep the *visible* rim the same width as everywhere else.
+
+`TestAppMark` in `tests/test_ui_support.py` pins this by comparing the mark's
+median lightness and mean saturation against the series artwork, so the
+threshold moves with the family instead of being a number someone once typed.
+
 ## 7. Layers
 
 ```
@@ -225,7 +253,7 @@ i18n/        reading languages + menu catalogues
 ```
 
 `domain/` is pure: no I/O, no network, and no clock — `now` is always a
-parameter. That is what makes 380 tests run in under seven seconds with no
+parameter. That is what makes 459 tests run in under ten seconds with no
 network access, and it is why the rules above can be asserted directly rather
 than inferred from behaviour.
 
@@ -262,6 +290,24 @@ mode drops the pane, the pages carry no horizontal margin of their own, and the
 dialog's single margin is the one the tab labels already align to. Group boxes
 are labels instead: Fusion draws a box's frame even when the box is asked to be
 flat, and another frame is exactly what was being removed.
+
+### The tray mode is two pictures of a library, not a switch
+
+"One icon for the whole library" was a checkbox. It reads as a feature you can
+turn on, which invites the question "on top of what?" — but the two settings
+are alternatives: either the panel shows one icon or it shows several. A pair
+of radios states that; a checkbox hides it.
+
+The emblem the aggregate icon wears sits *on* the one-icon row and greys out
+with it. A control that cannot apply says so by being unavailable rather than
+by being explained in a sentence beside it, and putting it on the row makes it
+obvious which option it belongs to. The remaining hint is indented to the
+radio's *label*, measured from `QStyle.PixelMetric.PM_ExclusiveIndicatorWidth`
+because the indicator's width is a platform decision, so it attaches to one
+option instead of floating under the group.
+
+Only `_one_icon.toggled` is connected. Both radios move on every click, so
+reacting to both would save the same change twice.
 
 ### Importing artwork asks which manga, not what to call it
 

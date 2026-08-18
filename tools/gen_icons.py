@@ -11,6 +11,7 @@ Run with:  uv run python tools/gen_icons.py
 """
 
 import subprocess
+import sys
 from pathlib import Path
 
 from pydantic import BaseModel, Field
@@ -118,15 +119,58 @@ def _book(p: Palette) -> str:
 """
 
 
-EMBLEMS = {"onepiece": _onepiece, "book": _book}
+# The app's own mark: a heavy M. It stands for the whole library rather than
+# for any one series, which is why it is a letter and not an object -- the
+# aggregate icon used to borrow the straw hat, and a library of thirty titles
+# then looked like One Piece.
+#
+# Drawn as a single filled silhouette rather than a stroked letterform: at 16px
+# a stroked M closes up into a blob, whereas a solid shape with an 8px-wide
+# valley keeps its three strokes apart.
+#
+# The stems are deliberately fat. A letter has far less area per unit of
+# outline than a hat or a book does, and in the break state -- a near-black
+# body with a light rim -- a thin glyph turns into an outline drawing instead
+# of a silhouette. Fat stems plus ``paint-order`` (below) keep the body dark.
+_M = "M8 53 L8 11 L24 11 L32 30 L40 11 L56 11 L56 53 L41 53 L41 28 L36 39 L28 39 L23 28 L23 53 Z"
+
+
+def _mangame(p: Palette) -> str:
+    # paint-order="stroke fill" puts the outline *behind* the fill, so only its
+    # outer half shows. On the hat and the book that would barely register; on
+    # a letterform it is the difference between a dark mark with a rim and a
+    # pale one with a dark hole.
+    return f"""{SVG_HEADER}
+  <defs><clipPath id="mark"><path d="{_M}"/></clipPath></defs>
+  <g stroke="{p.line}" stroke-opacity="{p.line_opacity}" stroke-width="6"
+     paint-order="stroke fill" stroke-linejoin="round" stroke-linecap="round">
+    <path d="{_M}" fill="{p.base}"/>
+    <g clip-path="url(#mark)" stroke="none">
+      <rect x="32" y="8" width="26" height="48" fill="{p.shade}"/>
+      <rect x="6" y="45" width="52" height="6" fill="{p.accent}"/>
+      <rect x="6" y="49" width="52" height="4" fill="{p.accent_shade}"/>
+    </g>
+  </g>
+</svg>
+"""
+
+
+EMBLEMS = {"onepiece": _onepiece, "book": _book, "mangame": _mangame}
 
 
 def _run(cmd: list[str]) -> None:
     subprocess.run(cmd, check=True, capture_output=True)
 
 
-def build() -> None:
-    for emblem, render in EMBLEMS.items():
+def build(only: str | None = None) -> None:
+    """Render every emblem, or just ``only``.
+
+    Regenerating an emblem that did not change still rewrites its PNGs, and a
+    different Inkscape build produces different bytes for identical artwork.
+    Naming one emblem keeps that churn out of the diff.
+    """
+    wanted = EMBLEMS if only is None else {only: EMBLEMS[only]}
+    for emblem, render in wanted.items():
         for palette in PALETTES:
             out_dir = OUT_ROOT / emblem / palette.name
             out_dir.mkdir(parents=True, exist_ok=True)
@@ -157,4 +201,4 @@ def build() -> None:
 
 
 if __name__ == "__main__":
-    build()
+    build(sys.argv[1] if len(sys.argv) > 1 else None)
