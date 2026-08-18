@@ -1,0 +1,80 @@
+[project]
+name = "mangame"
+version = "0.1.0"
+description = "A tiny cross-platform system-tray companion that tells you, at a glance, whether your manga is on break, due, or ready to read."
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+dependencies = [
+    "pydantic>=2.9",
+    "httpx>=0.27",
+    "platformdirs>=4.3",
+    "PySide6-Essentials>=6.8",
+]
+
+[project.optional-dependencies]
+dev = [
+    "mypy>=1.11",
+    "ruff>=0.6",
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "respx>=0.21",
+    "pre-commit>=3.8",
+    "pillow>=10.4",
+]
+
+[project.scripts]
+mangame = "mangame.__main__:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/mangame"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle
+    "F",    # pyflakes
+    "I",    # isort
+    "N",    # pep8-naming
+    "UP",   # pyupgrade
+    "B",    # bugbear
+    "SIM",  # simplify
+    "RUF",  # ruff-specific
+    "ANN",  # annotations
+    "ASYNC",
+]
+extend-ignore = [
+    "ANN401",  # allow Any where a boundary genuinely needs it
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["ANN"]
+"tools/*" = ["ANN"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unreachable = true
+
+[[tool.mypy.overrides]]
+# Platform-specific branches are unreachable on whichever OS mypy runs on.
+# CI type-checks with --platform win32/darwin/linux to cover all three.
+module = ["mangame.service.autostart"]
+warn_unreachable = false
+
+[[tool.mypy.overrides]]
+module = ["PySide6.*", "shiboken6.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+addopts = "--import-mode=importlib"
+pythonpath = ["."]
