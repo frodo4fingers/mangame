@@ -285,3 +285,52 @@
   explicit flag, which is what `setVisible` toggles.
 - **Rule**: Test the flag you set. Use `isHidden()` for "did I hide this", and
   keep `isVisible()` for "is the user actually looking at it".
+
+### Measure before optimising, and be willing to retract
+- **What**: I proposed two optimisations. One (deferring httpx) was worth
+  ~10 MB and ~160 ms. The other (rendering fewer icon sizes) was wrong:
+  `QIcon.addFile` already stores a filename and rasterises on demand, so twelve
+  sizes cost ~11 kB. Measuring also found a bigger fish neither guess named —
+  four eagerly-constructed connection pools, rebuilt on every search.
+- **Why**: Both guesses were plausible. Plausibility is not evidence, and the
+  cost that actually hurt was in the repetition, not the size.
+- **Rule**: Measure the specific claim before implementing it, and say so when
+  it does not survive. A retracted optimisation is a result; an implemented one
+  that saves nothing is debt.
+
+### A long-lived process is not a baseline
+- **What**: The first comparison put the old build at 122 MB against 85 MB. But
+  the old process had been running for hours with dialogs opened repeatedly.
+  Fresh, at the same age, it was 96 MB — a real 11 MB win, not 37.
+- **Why**: Resident memory in a GUI process grows with what the user did to it,
+  not only with what the code allocates at startup.
+- **Rule**: Compare processes of the same age doing the same things, and
+  isolate the change with a stash-and-rerun A/B rather than trusting whatever
+  happens to be running.
+
+### Lazy is worth more where it repeats than where it is large
+- **What**: Deferring the httpx *import* saved 3.4 MB once. Deferring the four
+  `AsyncClient` constructions saved 10 MB and 350 ms **per search**, because
+  `SearchWorker` builds a registry every time.
+- **Why**: Startup costs are paid once and amortise. A cost inside a
+  user-triggered path is paid at exactly the moment the user is waiting.
+- **Rule**: Before optimising a construction cost, find out how often it is
+  constructed. "Once at startup" and "once per interaction" deserve very
+  different amounts of effort.
+
+### Deferred work must be observable, or it cannot be tested
+- **What**: `HttpClient.connected` exists so tests can assert that a pool was
+  never opened. Without it the only evidence of laziness would be timing.
+- **Why**: An optimisation with no observable consequence silently regresses
+  the first time someone adds an eager call.
+- **Rule**: When making something lazy, expose the fact that it is still
+  unloaded. Then assert on it.
+
+### mypy narrows properties across await
+- **What**: `assert client.connected is False` ... `await` ... `assert
+  client.connected is True` failed as `[unreachable]`: mypy kept the
+  `Literal[False]` narrowing of the member expression across the await.
+- **Why**: mypy narrows member expressions, including properties, and an await
+  does not invalidate that narrowing.
+- **Rule**: For before/after assertions on a property, capture both into locals
+  and compare the pair. It type-checks, and it reads better.

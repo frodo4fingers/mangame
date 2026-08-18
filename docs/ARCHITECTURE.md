@@ -312,3 +312,39 @@ settings every tick, so there is no shared mutable state between threads at all.
   `tomllib` is read-only, and a hand-rolled writer is a bug farm.
 - **Pydantic models throughout** — validation at the edges (API payloads,
   config files, the database) is exactly where the untrusted data is.
+
+### Nothing on the way to a visible icon pays for the network
+
+A tray app is judged on resident memory, because it is measured while doing
+nothing. Two costs used to land on the startup path without being needed there,
+both in `sources/http.py`:
+
+| | Cost | Now paid |
+| --- | --- | --- |
+| `import httpx` | ~3.4 MB, ~140 ms | first request |
+| `httpx.AsyncClient` × 4 (one per adapter) | ~10.2 MB, ~350 ms | first request *to that source* |
+
+Neither belonged there. The GUI imports `mangame.sources` to ask a *metadata*
+question — which adapters serve which reading language — and metadata needs no
+transport. So `httpx` is imported inside the two methods that genuinely use it,
+with a `TYPE_CHECKING` import for the annotations, and each `HttpClient` opens
+its pool on first request rather than in its constructor.
+
+The second one matters more than its size suggests, because it is paid
+repeatedly. `SearchWorker` builds a fresh `SourceRegistry` for **every** search
+and then deliberately skips sources that cannot serve the reading language — but
+the constructor had already opened a pool for each of them. Searching cost
+~350 ms of TLS-context setup before a single byte moved. It is now ~1 ms.
+
+It is also permanent, not merely deferred. On a German library, MangaUpdates
+serves English only and `feed` is unused, so two of the four pools are never
+opened at all.
+
+Measured on the real app, same config, same age: **96.2 MB → 85.4 MB**, and
+~160 ms off time-to-visible-tray.
+
+**Not changed, having measured it:** the icon path. `QIcon.addFile` already
+records a filename and rasterises on demand, so listing twelve sizes costs
+~11 kB per icon, not twelve bitmaps. The procedural monogram *is* rendered
+eagerly at four sizes, but that is deliberate — text drawn at the target size
+beats text scaled to it, and the whole cache is a fraction of one pool.

@@ -8,15 +8,24 @@ Three concerns live here so that no adapter has to think about them:
   replayed, turning most polls into a 304 that costs almost nothing. This is
   what makes an aggressive hot-window cadence affordable.
 * **Retries** — 429 and 5xx back off exponentially and honour ``Retry-After``.
+
+``httpx`` is imported on first use rather than at module import. It costs
+~14 MB of resident memory and ~140 ms, and nothing on the path to a visible
+tray icon needs it: the UI only asks this package which sources *serve* a
+language, which is metadata. The underlying connection pool is likewise opened
+on the first request, so a registry hands out four clients for the price of the
+one or two that actually get asked something.
 """
 
 import asyncio
 import time
 from types import TracebackType
-from typing import Any, Self
+from typing import TYPE_CHECKING, Any, Self
 
-import httpx
 from pydantic import BaseModel, ConfigDict
+
+if TYPE_CHECKING:
+    import httpx
 
 USER_AGENT = "mangame/0.1 (+https://github.com/mangame/mangame)"
 
@@ -77,7 +86,11 @@ class Response(BaseModel):
 
 
 class HttpClient:
-    """Rate-limited, cache-aware JSON client shared by every adapter."""
+    """Rate-limited, cache-aware JSON client shared by every adapter.
+
+    The connection pool is opened lazily, so constructing one of these for a
+    source that is never asked anything costs a token bucket and nothing else.
+    """
 
     MAX_ATTEMPTS = 4
 
@@ -87,15 +100,29 @@ class HttpClient:
         rate_per_second: float = 2.0,
         burst: int = 4,
         timeout: float = 20.0,
-        client: httpx.AsyncClient | None = None,
+        client: "httpx.AsyncClient | None" = None,
     ) -> None:
         self._limiter = RateLimiter(rate_per_second, burst)
+        self._timeout = timeout
         self._owns_client = client is None
-        self._client = client or httpx.AsyncClient(
-            timeout=timeout,
-            headers={"User-Agent": USER_AGENT, "Accept": "application/json"},
-            follow_redirects=True,
-        )
+        self._client = client
+
+    @property
+    def connected(self) -> bool:
+        """Has this client actually opened a connection pool yet?"""
+        return self._client is not None
+
+    def _connect(self) -> "httpx.AsyncClient":
+        """Open the pool on first use. Importing httpx is part of the cost."""
+        if self._client is None:
+            import httpx
+
+            self._client = httpx.AsyncClient(
+                timeout=self._timeout,
+                headers={"User-Agent": USER_AGENT, "Accept": "application/json"},
+                follow_redirects=True,
+            )
+        return self._client
 
     async def __aenter__(self) -> Self:
         return self
@@ -109,8 +136,9 @@ class HttpClient:
         await self.aclose()
 
     async def aclose(self) -> None:
-        if self._owns_client:
+        if self._owns_client and self._client is not None:
             await self._client.aclose()
+            self._client = None
 
     async def request(
         self,
@@ -123,6 +151,9 @@ class HttpClient:
         validators: CacheValidators | None = None,
         parse_json: bool = True,
     ) -> Response:
+        import httpx
+
+        client = self._connect()
         merged = dict(headers or {})
         if validators is not None:
             merged.update(validators.as_headers())
@@ -131,7 +162,7 @@ class HttpClient:
         for attempt in range(self.MAX_ATTEMPTS):
             await self._limiter.acquire()
             try:
-                response = await self._client.request(
+                response = await client.request(
                     method, url, params=params, json=json_body, headers=merged
                 )
             except httpx.HTTPError as exc:  # network-level failure
@@ -165,7 +196,7 @@ class HttpClient:
         raise last_error or httpx.HTTPError(f"giving up on {url}")
 
     @staticmethod
-    def _retry_delay(response: httpx.Response, attempt: int) -> float:
+    def _retry_delay(response: "httpx.Response", attempt: int) -> float:
         retry_after = response.headers.get("Retry-After")
         if retry_after:
             try:

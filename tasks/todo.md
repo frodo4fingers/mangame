@@ -304,3 +304,38 @@ badge. The import wrote 36 files, reported success and changed nothing visible.
 - End to end through the real tray: pick the file, one click, config on disk
   says `emblem='hunter-x-hunter'`, and the tray icon's pixels change.
 - Screenshots of all four states in English and German.
+
+## Keeping the network off the startup path
+
+Asked whether Python was the right language for a tray app. Measured instead of
+guessed: Qt is ~48 MB of the resident set and is language-independent, so a
+rewrite that keeps Qt saves a third of memory for a total rewrite. The two
+costs that were *actually* misplaced were both in `sources/http.py`.
+
+- [x] `import httpx` moved inside the methods that use it, with a
+      `TYPE_CHECKING` import for the annotations.
+- [x] `HttpClient` opens its connection pool on first request, not in its
+      constructor, and exposes `connected` so this is observable.
+- [x] `aclose()` no longer opens a pool purely to close it.
+- [x] 10 tests, 9 of which fail against the previous code.
+
+### Measured, in a controlled A/B against the stashed old code
+
+| | Old | New |
+| --- | --- | --- |
+| time to visible tray | 825 ms | 668 ms |
+| `SourceRegistry()` | 354 ms, +10.2 MB | 0.6 ms, +0.04 MB |
+| httpx loaded at tray-visible | yes | no |
+| real app, fresh, same age | 96.2 MB | 85.4 MB |
+
+The repeated cost turned out to be the interesting one: `SearchWorker` builds a
+registry per search, so every search paid ~350 ms opening four TLS contexts and
+then skipped the sources that could not serve the reading language anyway.
+
+### Rejected after measuring
+
+- **Rewriting in Rust/Go.** Keeps Qt, so it saves ~40 MB of 122 for a total
+  rewrite. Dropping Qt reaches ~8 MB but the settings dialog — now the centre
+  of the app — would need building three times.
+- **Rendering fewer icon sizes.** `QIcon.addFile` is already lazy; twelve sizes
+  cost ~11 kB, not twelve bitmaps. The claim was wrong before it was measured.
