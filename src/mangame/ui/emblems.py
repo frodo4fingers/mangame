@@ -15,8 +15,6 @@ panels: full colour, desaturated grey, and a near-black silhouette with a light
 rim (which stays visible on a dark panel, where plain black would vanish).
 """
 
-from __future__ import annotations
-
 import hashlib
 from functools import lru_cache
 from pathlib import Path

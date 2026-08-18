@@ -6,8 +6,6 @@ reads that are not passed in explicitly. That keeps the interesting logic
 unit-testable and makes the tray layer a thin shell.
 """
 
-from __future__ import annotations
-
 from datetime import datetime, timedelta
 from enum import StrEnum
 

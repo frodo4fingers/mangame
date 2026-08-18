@@ -11,8 +11,6 @@ library, so this source costs a single call per sweep no matter how many
 series the user tracks.
 """
 
-from __future__ import annotations
-
 from datetime import UTC, datetime, timedelta
 from typing import Any
 

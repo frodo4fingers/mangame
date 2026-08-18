@@ -1,7 +1,5 @@
 """Where mangame keeps its things, per platform."""
 
-from __future__ import annotations
-
 from pathlib import Path
 
 from platformdirs import PlatformDirs

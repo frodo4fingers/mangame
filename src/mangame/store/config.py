@@ -6,8 +6,6 @@ hand-rolled serialiser to get subtly wrong. The file stays perfectly readable
 and hand-editable either way.
 """
 
-from __future__ import annotations
-
 import json
 import os
 import tempfile

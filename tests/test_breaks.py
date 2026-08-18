@@ -1,7 +1,5 @@
 """Break detection — the logic behind the black icon."""
 
-from __future__ import annotations
-
 from datetime import UTC, datetime, timedelta
 
 import pytest

@@ -11,8 +11,6 @@ for the user's whole library; only the series whose latest-chapter id actually
 moved get a follow-up per-series feed request.
 """
 
-from __future__ import annotations
-
 from datetime import UTC, datetime, timedelta
 from typing import Any
 

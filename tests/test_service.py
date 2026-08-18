@@ -1,7 +1,5 @@
 """Library + poller: signals in, icon state and a re-armed schedule out."""
 
-from __future__ import annotations
-
 from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
 from pathlib import Path

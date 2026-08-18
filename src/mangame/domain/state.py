@@ -9,8 +9,6 @@ freshly published chapter less readable. Only once you are caught up does the
 icon switch to black to tell you the next slot is cancelled.
 """
 
-from __future__ import annotations
-
 from datetime import datetime, timedelta
 
 from mangame.domain import breaks

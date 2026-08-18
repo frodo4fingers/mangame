@@ -7,8 +7,6 @@ offer. Everything else (when the next one is due, how hard to poll, whether a
 break is under way) is derived here.
 """
 
-from __future__ import annotations
-
 import statistics
 from collections import Counter
 from collections.abc import Iterable, Sequence

@@ -1,7 +1,5 @@
 """The generic RSS/Atom adapter — how a new site becomes a config line."""
 
-from __future__ import annotations
-
 from datetime import UTC, datetime
 
 import pytest

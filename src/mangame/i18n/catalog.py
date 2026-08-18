@@ -6,8 +6,6 @@ and an unknown language falls back to English wholesale, so a partial
 translation can never blank out a menu entry.
 """
 
-from __future__ import annotations
-
 from typing import Final
 
 #: Language code -> the name shown to the user, in that language.

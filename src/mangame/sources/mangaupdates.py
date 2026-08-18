@@ -12,8 +12,6 @@ returns ``latest_chapter`` in one cheap call, and that value is used as a
 watermark so the expensive history query only runs when something moved.
 """
 
-from __future__ import annotations
-
 from datetime import UTC, date, datetime, time, timedelta
 from typing import Any
 

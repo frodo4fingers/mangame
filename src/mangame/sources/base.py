@@ -11,8 +11,6 @@ new source therefore never touches the scheduler or the UI, which is what keeps
 "support a huge variety of sources" from turning into a maintenance sink.
 """
 
-from __future__ import annotations
-
 from datetime import timedelta
 from typing import Protocol, runtime_checkable
 

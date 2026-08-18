@@ -5,8 +5,6 @@ exactly one place that knows how a configured series, its stored chapters and
 whatever the sources last said add up to something the icon can render.
 """
 
-from __future__ import annotations
-
 from collections.abc import Iterable
 from datetime import datetime
 

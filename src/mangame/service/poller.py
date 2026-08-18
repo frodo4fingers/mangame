@@ -11,8 +11,6 @@ Two properties worth calling out:
   immediately notices what it owes, instead of resuming a stale timer.
 """
 
-from __future__ import annotations
-
 import asyncio
 import contextlib
 import logging

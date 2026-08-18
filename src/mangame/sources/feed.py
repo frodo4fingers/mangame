@@ -11,8 +11,6 @@ line, not a release. Feeds also honour ``ETag``/``If-Modified-Since`` properly,
 which makes the tight hot-window polling nearly free.
 """
 
-from __future__ import annotations
-
 import re
 from datetime import UTC, datetime, timedelta
 from email.utils import parsedate_to_datetime

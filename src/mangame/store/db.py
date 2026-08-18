@@ -11,8 +11,6 @@ blocking the poller's event loop for one is cheaper than the thread hop that
 would avoid it.
 """
 
-from __future__ import annotations
-
 import json
 import sqlite3
 from collections.abc import Iterable, Sequence

@@ -14,8 +14,6 @@ Break detection is ranked by how much the signal can be trusted:
    enough to blacken the icon.
 """
 
-from __future__ import annotations
-
 from collections.abc import Iterable
 from datetime import UTC, datetime, timedelta
 

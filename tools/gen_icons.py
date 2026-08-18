@@ -10,8 +10,6 @@ no third-party character art or logo is ever reproduced.
 Run with:  uv run python tools/gen_icons.py
 """
 
-from __future__ import annotations
-
 import subprocess
 from pathlib import Path
 

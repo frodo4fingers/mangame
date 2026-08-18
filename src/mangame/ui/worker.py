@@ -10,8 +10,6 @@ not shareable across threads, and WAL mode makes two connections to the same
 file cheap and safe.
 """
 
-from __future__ import annotations
-
 import asyncio
 import logging
 import threading

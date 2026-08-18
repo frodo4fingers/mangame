@@ -10,8 +10,6 @@ Everything here is a pure function of ``(now, snapshot-ish inputs)`` so the
 whole ladder is unit-testable without a clock or a network.
 """
 
-from __future__ import annotations
-
 import hashlib
 from datetime import datetime, timedelta
 

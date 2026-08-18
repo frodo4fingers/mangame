@@ -11,8 +11,6 @@ lines. Adding, removing and forcing a check live inside the Manga submenu,
 which keeps the top level from growing.
 """
 
-from __future__ import annotations
-
 import logging
 import re
 from datetime import UTC, datetime

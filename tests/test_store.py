@@ -1,7 +1,5 @@
 """Persistence: SQLite state and the JSON settings file."""
 
-from __future__ import annotations
-
 from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
 from pathlib import Path

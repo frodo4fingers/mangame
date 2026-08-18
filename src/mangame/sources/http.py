@@ -10,8 +10,6 @@ Three concerns live here so that no adapter has to think about them:
 * **Retries** — 429 and 5xx back off exponentially and honour ``Retry-After``.
 """
 
-from __future__ import annotations
-
 import asyncio
 import time
 from types import TracebackType

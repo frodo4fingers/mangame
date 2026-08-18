@@ -6,8 +6,6 @@ Each source gets its own rate-limited :class:`HttpClient`, which keeps one
 misbehaving site from starving the others.
 """
 
-from __future__ import annotations
-
 from collections.abc import Iterator
 from types import TracebackType
 from typing import Self

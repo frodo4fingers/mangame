@@ -1,7 +1,5 @@
 """The adaptive polling ladder: check harder as the due date approaches."""
 
-from __future__ import annotations
-
 from datetime import UTC, datetime, timedelta
 
 import pytest

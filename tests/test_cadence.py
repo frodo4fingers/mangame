@@ -1,7 +1,5 @@
 """Cadence learning: the layer that lets any source get away with timestamps only."""
 
-from __future__ import annotations
-
 from datetime import UTC, datetime, timedelta
 
 from mangame.domain import cadence as cadence_rules

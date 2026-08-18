@@ -1,7 +1,5 @@
 """Shared fixtures. Every test works off explicit clocks — no ``utcnow`` anywhere."""
 
-from __future__ import annotations
-
 from datetime import UTC, datetime, timedelta
 
 import pytest

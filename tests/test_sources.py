@@ -1,7 +1,5 @@
 """Source adapters against recorded API shapes. No network."""
 
-from __future__ import annotations
-
 import json
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime, timedelta

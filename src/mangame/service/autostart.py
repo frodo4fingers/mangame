@@ -11,8 +11,6 @@ a third-party package that may go unmaintained.
   ``RunAtLoad``.
 """
 
-from __future__ import annotations
-
 import contextlib
 import os
 import plistlib
