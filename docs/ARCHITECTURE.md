@@ -274,6 +274,26 @@ popup against the screen rather than the work area and run it off the display.
 now lists only actions, and everything with a value lives in
 `ui/settings_dialog.py`. A flat list of verbs cannot overflow.
 
+Both buttons raise it. A tray icon has no affordance but its picture, so the
+button someone tries first has to lead somewhere, and once the values moved out
+there is only one somewhere left. The left button used to open the newest
+chapter when one was waiting — invisible (nothing says an icon is clickable,
+let alone that it is clickable *sometimes*) and, in aggregate mode, dead, since
+the state it consulted is only recorded per series. `Context` stays unhandled:
+the platform raises the menu for the right button itself.
+
+Where the menu appears is `menu.menu_anchor()`. StatusNotifierItem hosts — KDE's
+panel, GNOME's AppIndicator extension — draw the icon in their own process and
+report an empty rectangle to Qt, so the pointer is the only anchor available
+there; Windows and macOS report a real one and get the menu lined up with the
+icon. `fitted_position` then lifts it clear of the panel either way.
+
+An open menu is never rebuilt. `refresh()` runs every minute and re-derives
+each icon's menu; swapping the object drops the last Python reference to the
+one on screen, and Qt deletes it under the pointer. A minute of staleness is
+the cheaper failure, and the better behaviour besides — items do not move while
+you are reaching for them.
+
 The dialogs own no services. They emit what the user asked for and are handed
 settings back, which is what lets them be tested without a poller, a database
 or a display. Two rules make that loop safe:

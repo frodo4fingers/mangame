@@ -13,13 +13,17 @@ the switches, which series show an icon, which emblem each wears — lives in
 That split is deliberate. The menu used to nest three deep (Manga ▸ Stop
 tracking ▸ a series), which is slow to reach and, on a panel pinned to a screen
 edge, prone to running off the display entirely. A flat list of verbs cannot.
+
+Either mouse button opens it. An icon in a panel shows nothing but a picture,
+so whichever button someone tries first has to arrive somewhere — and with the
+values moved out, there is only one somewhere left to arrive at.
 """
 
 import logging
 from datetime import UTC, datetime
 
 from PySide6.QtCore import QObject, QTimer, QUrl
-from PySide6.QtGui import QDesktopServices
+from PySide6.QtGui import QCursor, QDesktopServices
 from PySide6.QtWidgets import QApplication, QDialog, QMenu, QSystemTrayIcon
 
 from mangame.domain.models import IconState, SeriesSnapshot
@@ -35,7 +39,7 @@ from mangame.store.config import SeriesConfig, Settings, series_key
 from mangame.store.db import Database
 from mangame.ui.add_dialog import AddSeriesDialog, SeriesCandidate
 from mangame.ui.emblems import icon_for
-from mangame.ui.menu import TrayMenu
+from mangame.ui.menu import TrayMenu, menu_anchor
 from mangame.ui.settings_dialog import SettingsDialog
 from mangame.ui.worker import PollWorker, SearchWorker
 
@@ -52,6 +56,16 @@ EMBLEM_HINTS: dict[str, str] = {"one piece": "onepiece"}
 
 #: Sources worth attaching automatically when a series is added.
 PREFERRED_SOURCES = ("mangadex", "anilist", "mangaupdates")
+
+#: Clicks that raise the menu. Not ``Context``: the platform already raises it
+#: for the right button. Not ``MiddleClick`` either — a menu appearing under a
+#: button nobody aimed with is a surprise, not a shortcut.
+OPENS_MENU = frozenset(
+    {
+        QSystemTrayIcon.ActivationReason.Trigger,
+        QSystemTrayIcon.ActivationReason.DoubleClick,
+    }
+)
 
 
 def emblem_for(title: str) -> str:
@@ -161,7 +175,7 @@ class MangameTray(QObject):
         icon = self._icons.get(key)
         if icon is None:
             icon = QSystemTrayIcon(self)
-            icon.activated.connect(lambda _reason, k=key: self._on_activated(k))
+            icon.activated.connect(lambda reason, k=key: self._on_activated(k, reason))
             self._icons[key] = icon
         return icon
 
@@ -178,6 +192,16 @@ class MangameTray(QObject):
         # QSystemTrayIcon is not a QWidget, so the menu cannot be parented to
         # it. Keeping a reference here is what stops Python from collecting a
         # menu that Qt is still showing.
+        #
+        # Which is also why an open one is left alone. The tray re-derives
+        # state every minute; replacing the menu then drops the last reference
+        # to the one under the pointer, and Qt deletes it mid-click. A minute
+        # of staleness is the cheaper failure — and the better behaviour
+        # anyway, since items do not move while you are reaching for them.
+        showing = self._menus.get(id(owner))
+        if showing is not None and showing.isVisible():
+            return showing
+
         menu = TrayMenu()
         self._menus[id(owner)] = menu
 
@@ -296,11 +320,28 @@ class MangameTray(QObject):
         self._library.mark_read(key)
         self.refresh()
 
-    def _on_activated(self, key: str) -> None:
-        """Left-click. Only meaningful where the platform delivers it."""
-        state = self._last_state.get(key)
-        if state is IconState.READY:
-            self._open(key)
+    def _on_activated(self, key: str, reason: QSystemTrayIcon.ActivationReason) -> None:
+        """Open the menu on a left click, the same one the right button gives.
+
+        Two buttons, one menu. A tray icon has no other affordance — there is
+        nothing to see on it but the picture — so the click people try first
+        has to lead somewhere, and the menu is the only somewhere there is.
+
+        Left click used to open the newest chapter when one was waiting. That
+        was invisible (nothing says an icon is clickable, let alone that it is
+        clickable *sometimes*) and, in aggregate mode, dead: the state it
+        consulted is only recorded per series. The menu still offers it, spelt
+        out, one line down.
+
+        ``Context`` is deliberately not handled: Qt raises the context menu for
+        the right button itself, and popping it a second time would fight that.
+        """
+        if reason not in OPENS_MENU:
+            return
+        icon = self._icons.get(key)
+        menu = icon.contextMenu() if icon is not None else None
+        if icon is not None and menu is not None:
+            menu.popup(menu_anchor(icon.geometry(), QCursor.pos()))
 
     def _quit(self) -> None:
         self.shutdown()

@@ -383,3 +383,23 @@ outline behind the fill so only its outer half shows; the stroke is doubled to
 - The real app, on the real config, screenshotted in the real panel: the M in
   aggregate mode, two series icons in per-manga mode, and the book after
   pointing `tray_emblem` at it.
+
+## Either button opens the menu
+
+- [x] `Trigger` and `DoubleClick` pop the icon's own menu; `Context` is left to
+      the platform and `MiddleClick` is ignored rather than acted on.
+- [x] `menu.menu_anchor()` picks the anchor: the icon's rectangle where the
+      desktop reports one, the pointer where it does not. Measured — KDE's
+      panel hands Qt `QRect(0, 0, 0, 0)`.
+- [x] Left click no longer opens a chapter and marks it read. It was invisible,
+      and in aggregate mode it never fired at all: `_last_state` is only
+      written per series.
+- [x] `_build_menu` leaves an open menu alone. The 60-second refresh replaced
+      it, dropping the last reference to the menu under the pointer.
+
+### Verified
+
+- 469 tests; 5 of the new ones fail against the previous commit.
+- A real click, synthesised through XTest at the icon's screen coordinates, so
+  the whole path was exercised: KDE's panel → StatusNotifierItem → the app.
+  The German menu appeared, lifted clear of the taskbar.

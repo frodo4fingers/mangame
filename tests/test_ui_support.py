@@ -12,7 +12,7 @@ from PySide6.QtGui import QColor, QImage
 from mangame.domain.models import IconState
 from mangame.i18n.catalog import _CATALOGS, _EN, LANGUAGES, Translator, available
 from mangame.ui import emblems
-from mangame.ui.menu import fitted_position
+from mangame.ui.menu import fitted_position, menu_anchor
 
 
 class TestTranslator:
@@ -211,6 +211,21 @@ class TestMonogramFallback:
 
     def test_real_artwork_is_still_preferred(self, qapp: object) -> None:
         assert self.rendered("onepiece", "One Piece") != self.rendered("monogram", "One Piece")
+
+
+class TestMenuAnchor:
+    """Where a tray menu is asked to appear when its icon is clicked."""
+
+    CURSOR = QPoint(1720, 1420)
+
+    def test_it_follows_the_icon_where_the_desktop_reports_one(self) -> None:
+        assert menu_anchor(QRect(1700, 1400, 24, 24), self.CURSOR) == QPoint(1700, 1400)
+
+    def test_it_falls_back_to_the_pointer_where_the_desktop_does_not(self) -> None:
+        # StatusNotifierItem hosts draw the icon themselves and hand Qt an
+        # empty rectangle, so on KDE and GNOME this is the only branch taken.
+        assert menu_anchor(QRect(), self.CURSOR) == self.CURSOR
+        assert menu_anchor(QRect(0, 0, 0, 0), self.CURSOR) == self.CURSOR
 
 
 class TestMenuFitting:

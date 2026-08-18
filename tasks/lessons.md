@@ -373,3 +373,31 @@
   start *and* its end. Afterwards, check the test count went up by what you
   added — this is the second time this session that a blind edit destroyed
   working code.
+
+### A tray icon's only affordance is its picture
+- **What**: Left click opened the newest chapter when one was waiting, and did
+  nothing otherwise — including always, in aggregate mode, where the state it
+  read is never written.
+- **Why**: An icon in a panel cannot show that it is clickable, so a behaviour
+  that only sometimes happens is indistinguishable from a broken one.
+- **Rule**: Give both buttons the same destination. If a click has a shortcut
+  worth having, put it in the menu too, where it can be read.
+
+### Rebuilding a menu on a timer deletes the one on screen
+- **What**: `refresh()` runs every minute and replaced each icon's `QMenu`.
+  The dict holding it was the only reference, so an open menu was collected.
+- **Why**: `QSystemTrayIcon` is not a `QWidget`, so its menu cannot be
+  parented to it and Python's refcount is what keeps it alive.
+- **Rule**: Before replacing a widget on a timer, ask whether it can be on
+  screen. Skip the rebuild while it is visible — stale beats vanished, and it
+  also stops items moving under the pointer.
+
+### Verify desktop integration by synthesising a real event
+- **What**: `libXtst` via `ctypes` sent an actual click at the icon's screen
+  coordinates, so KDE's panel and the StatusNotifierItem hop were exercised
+  rather than mocked, and a screenshot showed the result.
+- **Why**: The offscreen tests emit `activated` directly, which proves the
+  handler and nothing about whether the desktop ever calls it.
+- **Rule**: When behaviour depends on a component you do not own, drive it from
+  the outside at least once. `XTestFakeButtonEvent` needs `restype`/`argtypes`
+  set, or the 64-bit display pointer is truncated to an int.

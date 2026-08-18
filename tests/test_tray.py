@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 from PySide6.QtGui import QIcon
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
 
 from mangame.domain.models import IconState
 from mangame.store import config
@@ -113,3 +113,80 @@ class TestOneIconPerManga:
         hidden = [s.model_copy(update={"show_in_tray": False}) for s in SERIES]
         rebuild(tray, single_tray_icon=False, series=hidden)
         assert set(tray._icons) == {"__all__"}
+
+
+class TestClickingTheIcon:
+    """A tray icon has no affordance but the picture, so the first click has
+    to lead somewhere — and the menu is the only somewhere there is."""
+
+    @staticmethod
+    def click(tray: MangameTray, key: str, reason: QSystemTrayIcon.ActivationReason) -> QMenu:
+        tray._icons[key].activated.emit(reason)
+        menu = tray._icons[key].contextMenu()
+        assert menu is not None
+        return menu
+
+    @pytest.mark.parametrize(
+        "reason",
+        [
+            QSystemTrayIcon.ActivationReason.Trigger,
+            QSystemTrayIcon.ActivationReason.DoubleClick,
+        ],
+    )
+    def test_a_left_click_opens_the_menu(
+        self, tray: MangameTray, reason: QSystemTrayIcon.ActivationReason
+    ) -> None:
+        rebuild(tray, single_tray_icon=True)
+        assert self.click(tray, "__all__", reason).isVisible()
+
+    @pytest.mark.parametrize(
+        "reason",
+        [
+            QSystemTrayIcon.ActivationReason.Context,
+            QSystemTrayIcon.ActivationReason.MiddleClick,
+            QSystemTrayIcon.ActivationReason.Unknown,
+        ],
+    )
+    def test_nothing_else_raises_it_a_second_time(
+        self, tray: MangameTray, reason: QSystemTrayIcon.ActivationReason
+    ) -> None:
+        # The right button already has a menu, from the platform. Popping our
+        # own on top of that fights it; middle-click never asked for one.
+        rebuild(tray, single_tray_icon=True)
+        assert not self.click(tray, "__all__", reason).isVisible()
+
+    def test_the_menu_is_the_one_belonging_to_the_icon_clicked(self, tray: MangameTray) -> None:
+        rebuild(tray, single_tray_icon=False)
+        self.click(tray, "berserk", QSystemTrayIcon.ActivationReason.Trigger)
+
+        assert tray._icons["berserk"].contextMenu().isVisible()
+        assert not tray._icons["one-piece"].contextMenu().isVisible()
+
+    def test_a_click_does_not_open_a_chapter_behind_your_back(
+        self, tray: MangameTray, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # It used to, whenever the series happened to be READY -- silently
+        # marking it read as it went. Nothing on an icon says it is clickable,
+        # let alone that it is clickable only sometimes.
+        opened: list[str] = []
+        monkeypatch.setattr(tray, "_open", opened.append)
+        rebuild(tray, single_tray_icon=False)
+        tray._last_state["one-piece"] = IconState.READY
+
+        self.click(tray, "one-piece", QSystemTrayIcon.ActivationReason.Trigger)
+
+        assert opened == []
+
+    def test_a_refresh_does_not_pull_an_open_menu_out_from_under_you(
+        self, tray: MangameTray
+    ) -> None:
+        # The tray re-derives state every minute, and rebuilding the menu drops
+        # the last reference to the one on screen. A menu that vanishes -- or
+        # takes the process with it -- mid-click is worse than a stale one.
+        rebuild(tray, single_tray_icon=True)
+        menu = self.click(tray, "__all__", QSystemTrayIcon.ActivationReason.Trigger)
+
+        tray.refresh()
+
+        assert menu.isVisible()
+        assert tray._icons["__all__"].contextMenu() is menu

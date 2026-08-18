@@ -29,6 +29,9 @@ tray menu.
 
 ## The menu
 
+**Either mouse button opens it.** An icon in a panel shows nothing but a
+picture, so whichever button you try first has to arrive somewhere.
+
 The menu holds verbs only — the things you *do*:
 
 - **Open chapter / Mark as read** — only when there is something to open.
