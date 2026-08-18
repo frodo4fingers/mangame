@@ -1,12 +1,14 @@
-"""The README, held to the code.
+"""The documentation, held to the code.
 
-Prose is not testable and is not tested here. File names, sizes, defaults and
-language codes are, and those are exactly what had gone stale: the database was
-documented under a name it has never had, the Windows data directory under one
-platformdirs does not use, and the test count under a number three releases old.
+Prose is not testable and is not tested here. File names, sizes, defaults,
+language codes and release artifact names are, and those are exactly what had
+gone stale: the database was documented under a name it has never had, the
+Windows data directory under one platformdirs does not use, and the test count
+under a number three releases old.
 
 Only facts that appear verbatim in both places are pinned, so ordinary editing
-of the README stays free.
+stays free. Every markdown file in the repository has its relative links
+checked, because five of them now cross-reference each other.
 """
 
 import re
@@ -104,6 +106,30 @@ class TestWhatItPromisesToShip:
     def test_the_portable_directory_variable_is_named_correctly(self) -> None:
         assert paths.HOME_VAR in TEXT
 
-    def test_the_contributing_guide_it_links_to_exists(self) -> None:
-        for link in re.findall(r"\]\((?!http)([^)#]+)\)", TEXT):
-            assert (README.parent / link).exists(), f"README links to missing {link}"
+
+ROOT = README.parent
+DOCS = sorted(p for p in [*ROOT.glob("*.md"), *(ROOT / "docs").glob("*.md")])
+
+
+class TestEveryDocument:
+    """Applied to all of them, not just the README.
+
+    Five markdown files now cross-link each other. A link that rots is a
+    reader sent to a 404, and none of them is otherwise read by a test.
+    """
+
+    @pytest.mark.parametrize("doc", DOCS, ids=lambda p: p.name)
+    def test_its_relative_links_resolve(self, doc: Path) -> None:
+        body = doc.read_text(encoding="utf-8")
+
+        for link in re.findall(r"\]\((?!\w+:)([^)#]+)\)", body):
+            assert (doc.parent / link).exists(), f"{doc.name} links to missing {link}"
+
+    def test_the_agent_guide_is_the_only_one_of_its_kind(self) -> None:
+        # AGENTS.md is read by every major coding agent. A second copy under
+        # another tool's name is a rule that will drift out of agreement.
+        rivals = [p.name for p in ROOT.rglob("CLAUDE.md")]
+        rivals += [p.name for p in (ROOT / ".github").glob("copilot-instructions.md")]
+
+        assert (ROOT / "AGENTS.md").is_file()
+        assert not rivals, f"agent guidance duplicated in {rivals}"

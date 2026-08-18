@@ -3,6 +3,9 @@
 Thanks for looking. This is a small project with a few firm opinions; the ones
 that would otherwise surprise you are written down here.
 
+If you are working with an AI coding agent, point it at
+[AGENTS.md](AGENTS.md) — the same rules, stated the way an agent needs them.
+
 ## Getting set up
 
 Needs Python 3.12 or newer and [uv](https://docs.astral.sh/uv/).

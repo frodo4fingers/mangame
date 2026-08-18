@@ -358,7 +358,8 @@ target platforms, the pre-commit hooks, and a check that an installed wheel
 can still find its artwork. `.github/workflows/release.yml` builds the
 executables and publishes them when a `v*` tag is pushed.
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the full loop.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the full loop, and
+[AGENTS.md](AGENTS.md) if you are working with an AI coding agent.
 
 ## License
 

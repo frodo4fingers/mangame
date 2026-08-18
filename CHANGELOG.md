@@ -16,6 +16,8 @@ uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 - Continuous integration across three operating systems and two Python
   versions, including a check that an installed wheel can still find its
   artwork.
+- `AGENTS.md`, so the project's conventions travel with the repository instead
+  of living in one maintainer's editor settings.
 
 ### Fixed
 
