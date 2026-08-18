@@ -306,6 +306,43 @@ class TestWhereThingsLive:
 
         assert paths.home_override() is None
 
+    def test_artwork_can_live_apart_from_everything_else(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # Imported artwork is bulky, hand-collected, and worth keeping across
+        # a reinstall that throws the database away.
+        monkeypatch.setenv(paths.HOME_VAR, str(tmp_path / "home"))
+        monkeypatch.setenv(paths.EMBLEM_VAR, str(tmp_path / "art"))
+
+        assert paths.user_emblem_dir() == tmp_path / "art"
+        assert paths.config_file().parent == tmp_path / "home"
+
+    def test_the_artwork_directory_is_created_and_expanded(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv(paths.EMBLEM_VAR, str(tmp_path / "not-yet"))
+
+        assert paths.user_emblem_dir().is_dir()
+
+        # A user typing the variable by hand will write ~/art. Expanding it is
+        # the point of the assertion; the fake home is because this call also
+        # creates the directory, and tests do not write into real profiles.
+        monkeypatch.setenv("HOME", str(tmp_path / "home"))
+        monkeypatch.setenv("USERPROFILE", str(tmp_path / "home"))
+        monkeypatch.setenv(paths.EMBLEM_VAR, "~/art")
+
+        assert paths.user_emblem_dir() == tmp_path / "home" / "art"
+
+    def test_the_default_config_directory_ignores_the_override(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # It is what finds the .env that sets the override in the first place,
+        # so it must not follow it, and must not create anything.
+        monkeypatch.setenv(paths.HOME_VAR, str(tmp_path / "portable"))
+
+        assert paths.default_config_dir() != tmp_path / "portable"
+        assert not (tmp_path / "portable").exists()
+
     def test_an_empty_value_is_not_an_override(self, monkeypatch: pytest.MonkeyPatch) -> None:
         # Otherwise MANGAME_HOME= would resolve to the current directory.
         monkeypatch.setenv(paths.HOME_VAR, "")

@@ -201,6 +201,30 @@ MANGAME_HOME=/media/stick/mangame mangame
 `config.json` is plain JSON and safe to hand-edit while the app is running —
 every poll re-reads it.
 
+### Pointing mangame somewhere else
+
+Two variables move things around, and a `.env` file is a convenient place to
+keep them:
+
+| Variable | What it does |
+| --- | --- |
+| `MANGAME_HOME` | Settings, database and artwork all in this one directory. |
+| `MANGAME_EMBLEM_DIR` | Imported artwork here, wherever the rest lives. |
+| `MANGAME_ENV_FILE` | Read those from this file instead of a `.env`. |
+
+Copy [`.env.example`](.env.example) to `.env` and uncomment what you need.
+mangame reads the first one it finds:
+
+1. `$MANGAME_ENV_FILE`, if you set it
+2. `.env` in the current directory — handy when running from a clone
+3. `.env` beside the executable — a portable install carries its own
+4. `.env` in the configuration directory above — the only one a copy started
+   at login will find, since it has no meaningful working directory
+
+A variable already set in the real environment always wins over the file, so
+the one-off above keeps working. `.env` is git-ignored: nothing about your
+setup belongs in the repository.
+
 ## Settings only the file has
 
 Everything in the settings window is in `config.json` too, plus a few things

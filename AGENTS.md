@@ -59,6 +59,12 @@ installed, or its shell rules silently do not run.
   Qt runs on the `offscreen` platform via the session-scoped `qapp` fixture.
 - **Tests isolate with `MANGAME_HOME`, never the XDG variables.** Windows
   ignores XDG, so an XDG-based fixture writes into the real user profile there.
+  The same applies to anything that calls `mkdir`: `user_emblem_dir()` creates
+  what it returns, so a test expanding `~` must fake `HOME`/`USERPROFILE` too.
+- **The repository publishes empty.** No tracked series, no imported artwork,
+  nothing naming a person. Machine-local paths are environment variables read
+  from a git-ignored `.env`; `.env.example` is the committed template and a
+  test asserts it names every `MANGAME_*` variable the code reads.
 - **One version number**, in `src/mangame/__init__.py`. `pyproject.toml`
   declares `dynamic = ["version"]` and reads it. Nothing else may hardcode it.
 - **Bundled artwork is generated**, never hand-edited — see Artwork below.
@@ -69,7 +75,7 @@ installed, or its shell rules silently do not run.
 | --- | --- | --- |
 | `src/mangame/domain/` | Models, cadence learning, break detection, icon state, the poll-interval ladder | Pure. Guard this. |
 | `src/mangame/sources/` | One adapter per site behind a shared protocol | The only place that talks to the network |
-| `src/mangame/store/` | SQLite state, JSON settings, platform paths | |
+| `src/mangame/store/` | SQLite state, JSON settings, platform paths, `.env` | `env.load()` runs before any path is resolved |
 | `src/mangame/service/` | Poller, library orchestration, start-on-login | Platform branching lives here |
 | `src/mangame/ui/` | Tray, menus, dialogs, notifications, emblem rendering | Qt only here |
 | `src/mangame/i18n/` | Translation catalogue, language codes | en, de, es |

@@ -6,7 +6,8 @@ import sys
 from PySide6.QtWidgets import QApplication, QSystemTrayIcon
 
 from mangame import __version__
-from mangame.store.paths import HOME_VAR
+from mangame.store import env
+from mangame.store.paths import EMBLEM_VAR, HOME_VAR
 from mangame.ui.tray import MangameTray
 
 USAGE = f"""\
@@ -23,6 +24,14 @@ environment:
       platform's usual location. Useful for a portable copy, or a second
       instance that leaves the first alone.
 
+  {EMBLEM_VAR}
+      Keep imported artwork in this directory, wherever the rest lives.
+
+  {env.ENV_FILE_VAR}
+      Read these variables from this file. Otherwise the first '{env.FILENAME}'
+      found in the working directory, beside the executable, or in the
+      configuration directory is used.
+
 https://github.com/frodo4fingers/mangame
 """
 
@@ -38,9 +47,16 @@ def main() -> int:
         sys.stdout.write(USAGE)
         return 0
 
+    # Before anything resolves a path, or the app would read one directory and
+    # then be told to use another.
+    env_file = env.load()
+
     logging.basicConfig(
         level=logging.INFO, format="%(asctime)s %(levelname)-7s %(name)s: %(message)s"
     )
+
+    if env_file:
+        logging.getLogger("mangame").info("read environment from %s", env_file)
 
     app = QApplication(sys.argv)
     app.setApplicationName("mangame")

@@ -11,6 +11,8 @@ APP_ID = "mangame"
 
 HOME_VAR = "MANGAME_HOME"
 
+EMBLEM_VAR = "MANGAME_EMBLEM_DIR"
+
 
 def home_override() -> Path | None:
     """One directory holding everything, when ``MANGAME_HOME`` names one.
@@ -23,6 +25,15 @@ def home_override() -> Path | None:
     """
     named = os.environ.get(HOME_VAR)
     return Path(named).expanduser() if named else None
+
+
+def default_config_dir() -> Path:
+    """The platform's own location, ignoring any override.
+
+    Needed to find a ``.env``, which is what decides where the override points
+    in the first place. Creates nothing: this is a question, not a claim.
+    """
+    return Path(_DIRS.user_config_dir)
 
 
 def config_dir() -> Path:
@@ -46,7 +57,14 @@ def database_file() -> Path:
 
 
 def user_emblem_dir() -> Path:
-    """Drop-in folder so users can add their own emblems without a rebuild."""
-    path = data_dir() / "emblems"
+    """Drop-in folder so users can add their own emblems without a rebuild.
+
+    ``MANGAME_EMBLEM_DIR`` moves it anywhere, independently of the rest.
+    Artwork is the one thing worth keeping apart: it is bulky, it is the part
+    a user is most likely to have collected by hand, and it survives a
+    reinstall that throws the database away.
+    """
+    named = os.environ.get(EMBLEM_VAR)
+    path = Path(named).expanduser() if named else data_dir() / "emblems"
     path.mkdir(parents=True, exist_ok=True)
     return path

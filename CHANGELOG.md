@@ -18,6 +18,12 @@ uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
   artwork.
 - `AGENTS.md`, so the project's conventions travel with the repository instead
   of living in one maintainer's editor settings.
+- A git-ignored `.env` for machine-local paths, with `.env.example` as the
+  committed template. Read from the working directory, from beside the
+  executable, or from the configuration directory, and never allowed to
+  override a variable the real environment already set.
+- `MANGAME_EMBLEM_DIR` keeps imported artwork in a directory of its own,
+  wherever settings and database live.
 
 ### Fixed
 

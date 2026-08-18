@@ -18,3 +18,13 @@ htmlcov/
 # Working notes and local AI-tooling output, not part of the published project
 tasks/
 graphify-out/
+
+# Machine-local configuration. The template is committed, the real file is not:
+# where you keep your artwork and which manga you follow are nobody else's
+# business, and the published project has to be empty.
+.env
+.env.*
+!.env.example
+
+# A MANGAME_HOME inside the checkout, as suggested by .env.example
+local/
