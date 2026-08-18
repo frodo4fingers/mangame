@@ -14,7 +14,7 @@ from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
 
 from mangame.domain.models import IconState
-from mangame.store import config
+from mangame.store import config, paths
 from mangame.store.config import SeriesConfig, Settings
 from mangame.ui.emblems import icon_for
 from mangame.ui.tray import MangameTray
@@ -35,8 +35,7 @@ def pixels(icon: QIcon, size: int = 22) -> bytes:
 def tray(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, qapp: QApplication
 ) -> Iterator[MangameTray]:
-    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "config"))
-    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "data"))
+    monkeypatch.setenv(paths.HOME_VAR, str(tmp_path))
     config.save(Settings(series=SERIES))
     built = MangameTray(qapp)
     yield built

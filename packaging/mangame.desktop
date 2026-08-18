@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=mangame
+GenericName=Manga release radar
+Comment=Tells you at a glance whether your manga is on break, due, or ready to read
+Exec=mangame
+Icon=mangame
+Terminal=false
+Categories=Utility;Network;
+Keywords=manga;comics;tray;releases;
+StartupNotify=false

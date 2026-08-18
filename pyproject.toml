@@ -1,10 +1,28 @@
 [project]
 name = "mangame"
-version = "0.1.0"
+dynamic = ["version"]
 description = "A tiny cross-platform system-tray companion that tells you, at a glance, whether your manga is on break, due, or ready to read."
 readme = "README.md"
 requires-python = ">=3.12"
-license = { text = "MIT" }
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "frodo4fingers", email = "h.aarhus@mailbox.org" }]
+keywords = ["manga", "tray", "systray", "qt", "desktop", "release-tracker"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: MacOS X",
+    "Environment :: Win32 (MS Windows)",
+    "Environment :: X11 Applications :: Qt",
+    "Intended Audience :: End Users/Desktop",
+    "Operating System :: MacOS",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Desktop Environment",
+    "Topic :: Utilities",
+    "Typing :: Typed",
+]
 dependencies = [
     "pydantic>=2.9",
     "httpx>=0.27",
@@ -22,13 +40,28 @@ dev = [
     "pre-commit>=3.8",
     "pillow>=10.4",
 ]
+build = [
+    "pyinstaller>=6.11",
+    "pillow>=10.4",
+]
 
 [project.scripts]
 mangame = "mangame.__main__:main"
 
+[project.urls]
+Homepage = "https://github.com/frodo4fingers/mangame"
+Source = "https://github.com/frodo4fingers/mangame"
+Issues = "https://github.com/frodo4fingers/mangame/issues"
+Changelog = "https://github.com/frodo4fingers/mangame/blob/main/CHANGELOG.md"
+
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling>=1.27"]
 build-backend = "hatchling.build"
+
+[tool.hatch.version]
+# One source of truth: the package states its own version and the build reads
+# it, so a release cannot ship a number that disagrees with itself.
+path = "src/mangame/__init__.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/mangame"]

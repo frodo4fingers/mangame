@@ -1,0 +1,28 @@
+name: Feature or source request
+description: Something to add — including a manga site mangame cannot read yet.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What you want
+    validations:
+      required: true
+
+  - type: textarea
+    id: why
+    attributes:
+      label: What you are trying to do
+      description: >
+        The situation, not the solution — there may be a better way to get you
+        there than the one you have in mind.
+    validations:
+      required: true
+
+  - type: input
+    id: source
+    attributes:
+      label: If this is a new source, its URL
+      description: >
+        A public API endpoint helps enormously. Sources are only added when
+        their real responses can be read and parsed reliably.

@@ -1,0 +1,123 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Every widget test builds real Qt objects; none of them needs a display.
+  QT_QPA_PLATFORM: offscreen
+  FORCE_COLOR: "1"
+
+jobs:
+  test:
+    name: test · ${{ matrix.os }} · py${{ matrix.python }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python: ["3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install the Qt runtime libraries the Linux image does not ship
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libegl1 libgl1 libxkbcommon-x11-0 libdbus-1-3 \
+            libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 \
+            libxcb-randr0 libxcb-render-util0 libxcb-shape0 libxcb-xinerama0
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - run: uv sync --locked --extra dev --python ${{ matrix.python }}
+
+      - run: uv run pytest -q
+
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv sync --locked --extra dev
+      - name: Formatting
+        run: uv run ruff format --check .
+      - name: Lint
+        run: uv run ruff check .
+
+  types:
+    name: types
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv sync --locked --extra dev
+      - name: Type-check the way each platform will see it
+        # autostart branches on sys.platform, so one run cannot cover it.
+        run: |
+          uv run mypy --platform linux src tests tools
+          uv run mypy --platform win32 src tests tools
+          uv run mypy --platform darwin src tests tools
+
+  hooks:
+    name: pre-commit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv sync --locked --extra dev
+      - run: uv run pre-commit run --all-files --show-diff-on-failure
+
+  package:
+    name: package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - run: uv build
+
+      - name: The artwork has to survive packaging
+        # A wheel that installs but has no emblems starts with an empty tray,
+        # and nothing in the unit tests would notice.
+        run: |
+          uv venv /tmp/smoke --python 3.12
+          VIRTUAL_ENV=/tmp/smoke uv pip install dist/*.whl
+          MANGAME_HOME=/tmp/smoke-home /tmp/smoke/bin/python - <<'PY'
+          from pathlib import Path
+
+          from mangame.store import paths
+          from mangame.ui import emblems
+
+          bundled = emblems.BUNDLED_DIR
+          assert bundled.is_dir(), f"no emblem directory at {bundled}"
+          shipped = {d.name for d in bundled.iterdir() if d.is_dir()}
+          assert {"mangame", "onepiece", "book"} <= shipped, shipped
+          assert (bundled / "mangame" / "ready" / "22.png").is_file()
+          assert paths.config_dir() == Path("/tmp/smoke-home")
+          print("shipped emblems:", sorted(shipped))
+          PY
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: distributions
+          path: dist/*

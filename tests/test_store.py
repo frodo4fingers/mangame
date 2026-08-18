@@ -8,6 +8,7 @@ import pytest
 
 from mangame.domain.models import BreakWindow, Cadence, Chapter, Confidence, PublicationStatus
 from mangame.store import config as config_store
+from mangame.store import paths
 from mangame.store.db import Database, LearnedState, PollState
 
 NOW = datetime(2026, 8, 18, 12, 0, tzinfo=UTC)
@@ -261,3 +262,52 @@ class TestSeriesKey:
         # A key is a primary key; an empty one would collide with every other.
         assert config_store.series_key("!!!") == "series"
         assert config_store.series_key("") == "series"
+
+
+class TestWhereThingsLive:
+    """``MANGAME_HOME`` has to override on every platform, not just Linux.
+
+    ``platformdirs`` reads the XDG variables on Linux and macOS but not on
+    Windows. Isolation that leans on them passes locally and then writes into
+    the real user profile on a Windows CI runner.
+    """
+
+    def test_the_home_variable_gathers_everything_in_one_place(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv(paths.HOME_VAR, str(tmp_path / "portable"))
+
+        assert paths.config_file().parent == tmp_path / "portable"
+        assert paths.database_file().parent == tmp_path / "portable"
+        assert paths.user_emblem_dir() == tmp_path / "portable" / "emblems"
+
+    def test_the_directory_is_created_on_demand(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        home = tmp_path / "not-yet"
+        monkeypatch.setenv(paths.HOME_VAR, str(home))
+
+        assert paths.config_dir().is_dir()
+        assert home.is_dir()
+
+    def test_a_tilde_is_expanded(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        # A user typing the variable by hand will write ~/mangame.
+        monkeypatch.setenv(paths.HOME_VAR, "~/mangame-test")
+
+        override = paths.home_override()
+        assert override is not None
+        assert "~" not in str(override)
+        assert override.is_absolute()
+
+    def test_without_the_variable_the_platform_decides(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.delenv(paths.HOME_VAR, raising=False)
+
+        assert paths.home_override() is None
+
+    def test_an_empty_value_is_not_an_override(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        # Otherwise MANGAME_HOME= would resolve to the current directory.
+        monkeypatch.setenv(paths.HOME_VAR, "")
+
+        assert paths.home_override() is None

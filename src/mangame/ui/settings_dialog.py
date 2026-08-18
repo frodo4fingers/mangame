@@ -55,6 +55,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from mangame import __version__
 from mangame.domain.models import IconState
 from mangame.i18n.catalog import Translator, available
 from mangame.store.config import SeriesConfig, Settings
@@ -288,11 +289,23 @@ class SettingsDialog(QDialog):
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close, self)
         buttons.rejected.connect(self.reject)
 
+        # The one fact a bug report always needs, where someone will look for
+        # it: quiet, selectable, and out of the way of the actual controls.
+        self._version = QLabel(f"{APP_TITLE} {__version__}", self)
+        self._version.setEnabled(False)
+        self._version.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+
+        footer = QHBoxLayout()
+        footer.setContentsMargins(0, 0, 0, 0)
+        footer.addWidget(self._version)
+        footer.addStretch(1)
+        footer.addWidget(buttons)
+
         layout = QVBoxLayout(self)
         layout.setContentsMargins(PAGE_MARGIN, PAGE_MARGIN, PAGE_MARGIN, PAGE_MARGIN)
         layout.setSpacing(PAGE_SPACING)
         layout.addWidget(self._tabs, 1)
-        layout.addWidget(buttons)
+        layout.addLayout(footer)
 
         self._autostart.setChecked(autostart_enabled)
         self._autostart.setEnabled(autostart_supported)

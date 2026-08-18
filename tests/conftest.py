@@ -63,10 +63,10 @@ def qapp() -> Iterator["QApplication"]:
 def emblem_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Path]:
     """Point imported artwork at a throwaway directory.
 
-    ``platformdirs`` honours the XDG variables, so redirecting the data home
-    is enough to keep a test from writing into the developer's own emblems.
+    ``MANGAME_HOME`` rather than the XDG variables, because Windows ignores
+    those — the test would write into the real user profile there.
     """
-    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
+    monkeypatch.setenv(paths.HOME_VAR, str(tmp_path))
     emblems.forget_artwork()
     yield paths.user_emblem_dir()
     emblems.forget_artwork()

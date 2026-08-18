@@ -14,3 +14,7 @@ dist/
 # Local tooling
 .coverage
 htmlcov/
+
+# Working notes and local AI-tooling output, not part of the published project
+tasks/
+graphify-out/

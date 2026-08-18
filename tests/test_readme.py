@@ -22,6 +22,9 @@ from mangame.ui import emblems
 README = Path(__file__).resolve().parents[1] / "README.md"
 TEXT = README.read_text(encoding="utf-8")
 
+RELEASE = README.parent / ".github" / "workflows" / "release.yml"
+RELEASE_LABELS = set(re.findall(r"label: ([a-z0-9_-]+)", RELEASE.read_text(encoding="utf-8")))
+
 
 class TestPaths:
     def test_the_database_is_named_as_it_is_written(self) -> None:
@@ -78,3 +81,29 @@ class TestFileOnlySettings:
         fields = set(config.Settings.model_fields) | set(config.SeriesConfig.model_fields)
         assert key in fields
         assert key in TEXT
+
+
+class TestWhatItPromisesToShip:
+    """Download names are a promise the release workflow has to keep.
+
+    A README that names an archive nobody builds sends users to a 404, and
+    nothing else in the suite reads the workflow.
+    """
+
+    def test_every_download_it_offers_is_actually_built(self) -> None:
+        offered = set(re.findall(r"`mangame-([a-z0-9_-]+)\.(?:tar\.gz|zip)`", TEXT))
+
+        assert offered, "the download table no longer names any file"
+        assert offered <= RELEASE_LABELS, offered - RELEASE_LABELS
+
+    def test_every_build_produced_is_offered(self) -> None:
+        offered = set(re.findall(r"`mangame-([a-z0-9_-]+)\.(?:tar\.gz|zip)`", TEXT))
+
+        assert offered >= RELEASE_LABELS, RELEASE_LABELS - offered
+
+    def test_the_portable_directory_variable_is_named_correctly(self) -> None:
+        assert paths.HOME_VAR in TEXT
+
+    def test_the_contributing_guide_it_links_to_exists(self) -> None:
+        for link in re.findall(r"\]\((?!http)([^)#]+)\)", TEXT):
+            assert (README.parent / link).exists(), f"README links to missing {link}"

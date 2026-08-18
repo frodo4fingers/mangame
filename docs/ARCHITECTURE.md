@@ -414,3 +414,58 @@ records a filename and rasterises on demand, so listing twelve sizes costs
 ~11 kB per icon, not twelve bitmaps. The procedural monogram *is* rendered
 eagerly at four sizes, but that is deliberate — text drawn at the target size
 beats text scaled to it, and the whole cache is a fraction of one pool.
+
+## 8. Shipping it
+
+### One directory can override the platform's
+
+`platformdirs` puts settings and data where each OS expects, which is right for
+an installed app and wrong for two other cases: a portable copy that should
+keep its state beside itself, and a test that must not touch the developer's
+real profile.
+
+`MANGAME_HOME` covers both. `store/paths.py` consults it before asking
+`platformdirs`, so config, database and imported artwork all land in one
+directory of the caller's choosing.
+
+The test suite used to isolate itself by pointing `XDG_DATA_HOME` at a
+temporary directory. That works on Linux — and on macOS, where recent
+`platformdirs` honours the XDG variables too — but **Windows ignores them
+entirely**. On a Windows runner those tests would have written into the real
+`%APPDATA%\mangame`, contaminating each other and the machine. The bug was
+invisible for as long as the project only ever ran its tests on Linux; adding a
+three-platform CI matrix is what made it matter.
+
+### The version has one home
+
+`src/mangame/__init__.py` states `__version__`, and `pyproject.toml` declares
+`dynamic = ["version"]` so hatchling reads it from there. Nothing else may
+carry a version number: the PyInstaller spec interpolates it into the macOS
+`Info.plist`, and a test asserts the installed metadata agrees with the
+package.
+
+That matters more for a frozen build than a wheel. `importlib.metadata` has
+nothing to answer with inside a PyInstaller bundle, so `mangame --version` has
+to read a constant the app carries itself.
+
+### Frozen builds, one recipe
+
+`packaging/mangame.spec` is the single build description, and the release
+workflow runs exactly the command a developer would run locally. It branches
+once, on `sys.platform`:
+
+- **Linux and Windows** — a one-file executable, because the promise is
+  "download it and run it".
+- **macOS** — an `.app` bundle rather than a bare binary, because only a bundle
+  can carry `LSUIElement`, and without that a tray-only app still claims a Dock
+  tile it has no use for.
+
+Every build is started once on its runner before it is allowed near a release
+page. On a headless runner it exits 1 with *no system tray found* — which is
+the correct answer, and proves the bootloader ran, Qt loaded and `main()` was
+reached. A bundle that cannot do that much is broken in a way no unit test
+would catch.
+
+The same reasoning covers the wheel: CI installs the built artifact into a
+fresh environment and asserts the emblem directory is present and populated. A
+wheel that imports cleanly but ships no artwork starts with an empty tray.

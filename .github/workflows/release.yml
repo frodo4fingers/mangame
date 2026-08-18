@@ -1,0 +1,145 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  FORCE_COLOR: "1"
+
+jobs:
+  binaries:
+    name: ${{ matrix.label }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            label: linux-x86_64
+            # Built on the oldest supported image so the glibc it links
+            # against is old enough for the distributions people run.
+          - os: windows-latest
+            label: windows-x86_64
+          - os: macos-latest
+            label: macos-arm64
+          - os: macos-13
+            label: macos-x86_64
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install the Qt runtime libraries the Linux image does not ship
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libegl1 libgl1 libxkbcommon-x11-0 libdbus-1-3 \
+            libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 \
+            libxcb-randr0 libxcb-render-util0 libxcb-shape0 libxcb-xinerama0
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - run: uv sync --locked --extra build --python 3.12
+
+      - name: Freeze
+        run: uv run pyinstaller packaging/mangame.spec --noconfirm
+
+      - name: Prove the build starts
+        # It exits 1 with "no system tray found" on a headless runner, which
+        # still means the bootloader ran, Qt loaded and main() was reached.
+        # A build that cannot even do that must never reach a release page.
+        shell: bash
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          case "${{ runner.os }}" in
+            Windows) target="dist/mangame.exe" ;;
+            macOS)   target="dist/mangame.app/Contents/MacOS/mangame" ;;
+            *)       target="dist/mangame" ;;
+          esac
+          MANGAME_HOME="${RUNNER_TEMP}/mangame-home" "$target" > out.txt 2>&1 || true
+          cat out.txt
+          grep -q "no system tray found" out.txt
+
+      - name: Wrap it up
+        shell: bash
+        run: |
+          mkdir -p upload
+          name="mangame-${{ matrix.label }}"
+          case "${{ runner.os }}" in
+            Windows)
+              7z a "upload/$name.zip" ./dist/mangame.exe ./LICENSE ./README.md
+              ;;
+            macOS)
+              # ditto, not zip: it is the only tool that preserves the bundle.
+              ditto -c -k --keepParent dist/mangame.app "upload/$name.zip"
+              ;;
+            *)
+              mkdir -p "$name"
+              cp dist/mangame LICENSE README.md "$name/"
+              cp packaging/mangame.desktop packaging/icons/mangame.png "$name/"
+              tar -czf "upload/$name.tar.gz" "$name"
+              ;;
+          esac
+          ls -lh upload
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mangame-${{ matrix.label }}
+          path: upload/*
+
+  distributions:
+    name: wheel and sdist
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: distributions
+          path: dist/*
+
+  release:
+    name: publish the release
+    needs: [binaries, distributions]
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - run: ls -R artifacts
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*/*
+          generate_release_notes: true
+          draft: false
+
+  pypi:
+    name: publish to PyPI
+    needs: [distributions]
+    # Off until a PyPI trusted publisher exists for this repository. Set the
+    # repository variable PUBLISH_TO_PYPI to "true" to turn it on; see
+    # CONTRIBUTING.md for the one-time setup.
+    if: startsWith(github.ref, 'refs/tags/') && vars.PUBLISH_TO_PYPI == 'true'
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: distributions
+          path: dist
+      - uses: pypa/gh-action-pypi-publish@release/v1

@@ -1,0 +1,58 @@
+name: Bug report
+description: Something behaves differently from what the README says.
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: And what you expected instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: How to reproduce it
+      placeholder: |
+        1. ...
+        2. ...
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: The tray menu's About entry, or the release you downloaded.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: install
+    attributes:
+      label: How you installed it
+      options:
+        - Downloaded build
+        - PyPI (uv tool / pipx / pip)
+        - From source
+    validations:
+      required: true
+
+  - type: input
+    id: platform
+    attributes:
+      label: Operating system and desktop
+      description: >
+        The desktop matters on Linux — KDE, GNOME with the AppIndicator
+        extension, XFCE, a tiling WM and so on.
+      placeholder: Fedora 41, KDE Plasma 6 on Wayland
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Anything it printed
+      description: Run it from a terminal to see the log. Redact anything private.
+      render: text

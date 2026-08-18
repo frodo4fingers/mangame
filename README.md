@@ -1,5 +1,9 @@
 # mangame
 
+[![CI](https://github.com/frodo4fingers/mangame/actions/workflows/ci.yml/badge.svg)](https://github.com/frodo4fingers/mangame/actions/workflows/ci.yml)
+[![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+
 A system-tray app that tells you, at a glance, whether there is manga to read.
 
 One icon per series. Three states, and nothing else to interpret:
@@ -20,16 +24,50 @@ or the menu bar, whichever your desktop calls it.
 
 ## Install
 
+### Download a build
+
+No Python, no toolchain — grab the file for your platform from the
+[releases page](https://github.com/frodo4fingers/mangame/releases) and run it.
+
+| Platform | File | Then |
+| --- | --- | --- |
+| Linux (x86-64) | `mangame-linux-x86_64.tar.gz` | Unpack and run `./mangame`. |
+| Windows (x86-64) | `mangame-windows-x86_64.zip` | Unpack and run `mangame.exe`. |
+| macOS (Apple silicon) | `mangame-macos-arm64.zip` | Unpack and move `mangame.app` to Applications. |
+| macOS (Intel) | `mangame-macos-x86_64.zip` | Same. |
+
+Two things the operating system will ask about:
+
+- **macOS** — the app is not signed with an Apple developer certificate, so
+  Gatekeeper blocks the first launch. Right-click it and choose *Open*, or run
+  `xattr -dr com.apple.quarantine mangame.app`.
+- **Linux** — if your browser cleared the executable bit, `chmod +x mangame`.
+  The archive also carries `mangame.desktop` and `mangame.png`; copy them into
+  `~/.local/share/applications/` and
+  `~/.local/share/icons/hicolor/512x512/apps/` to get a normal launcher entry.
+
+### Install from PyPI
+
+If you already have Python 3.12 or newer:
+
+```bash
+uv tool install mangame   # or: pipx install mangame
+mangame
+```
+
+### Run from source
+
 Needs Python 3.12 or newer and [uv](https://docs.astral.sh/uv/).
 
 ```bash
+git clone https://github.com/frodo4fingers/mangame
+cd mangame
 uv sync
 uv run mangame
 ```
 
-`uv run mangame` starts the tray. There is no window; everything happens in the
-tray menu. Turn on **Start on login** in Settings to have it come back by
-itself.
+However you start it, there is no window — everything happens in the tray menu.
+Turn on **Start on login** in Settings to have it come back by itself.
 
 ## The menu
 
@@ -113,6 +151,9 @@ starting the clock again.
 
 **Check now** in the menu ignores all of that and asks immediately.
 
+It talks only to those sources. There is no telemetry, no analytics and no
+update check — see [SECURITY.md](SECURITY.md).
+
 ## Languages
 
 The three supported languages are the ones the sources can actually be held to:
@@ -147,6 +188,15 @@ Resolved by `platformdirs`, so they land wherever your OS expects:
 
 On Linux the `XDG_CONFIG_HOME` and `XDG_DATA_HOME` variables are honoured if
 you set them.
+
+Set `MANGAME_HOME` to put settings, database and artwork in one directory of
+your choosing instead — for a portable copy on a USB stick, or to run a second
+instance without disturbing the first. It works the same on all three
+platforms:
+
+```bash
+MANGAME_HOME=/media/stick/mangame mangame
+```
 
 `config.json` is plain JSON and safe to hand-edit while the app is running —
 every poll re-reads it.
@@ -280,3 +330,36 @@ shape or a palette, optionally naming one emblem:
 uv run python tools/gen_icons.py           # all of them
 uv run python tools/gen_icons.py mangame   # just the M
 ```
+
+The installer icons in `packaging/icons/` come from the same drawing, rendered
+larger and packed into the containers Windows and macOS require:
+
+```bash
+uv run python tools/gen_app_icon.py
+```
+
+### Building a standalone executable
+
+```bash
+uv sync --extra build
+uv run pyinstaller packaging/mangame.spec --noconfirm
+```
+
+That leaves `dist/mangame` on Linux, `dist/mangame.exe` on Windows and
+`dist/mangame.app` on macOS. The release workflow runs the same command on a
+runner for each platform, so a build you can reproduce locally is the build
+users download.
+
+### Continuous integration
+
+`.github/workflows/ci.yml` runs the tests on Linux, Windows and macOS against
+Python 3.12 and 3.13, plus formatting, linting, type-checking for all three
+target platforms, the pre-commit hooks, and a check that an installed wheel
+can still find its artwork. `.github/workflows/release.yml` builds the
+executables and publishes them when a `v*` tag is pushed.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the full loop.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
