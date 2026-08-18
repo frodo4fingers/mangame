@@ -30,6 +30,7 @@ from mangame.store import config
 from mangame.store.config import SeriesConfig, Settings
 from mangame.store.db import Database
 from mangame.ui.emblems import icon_for
+from mangame.ui.menu import TrayMenu
 from mangame.ui.worker import PollWorker, SearchWorker
 
 LOG = logging.getLogger(__name__)
@@ -167,7 +168,7 @@ class MangameTray(QObject):
         # QSystemTrayIcon is not a QWidget, so the menu cannot be parented to
         # it. Keeping a reference here is what stops Python from collecting a
         # menu that Qt is still showing.
-        menu = QMenu()
+        menu = TrayMenu()
         self._menus[id(owner)] = menu
 
         if snapshot is not None:
@@ -201,7 +202,7 @@ class MangameTray(QObject):
         return menu
 
     def _manga_menu(self, parent: QMenu) -> QMenu:
-        menu = QMenu(self._t("menu.manga"), parent)
+        menu = TrayMenu(self._t("menu.manga"), parent)
 
         if not self._settings.series:
             empty = menu.addAction(self._t("menu.no_series"))
@@ -219,7 +220,7 @@ class MangameTray(QObject):
         add.triggered.connect(self._add_series)
 
         if self._settings.series:
-            remove = QMenu(self._t("menu.remove"), menu)
+            remove = TrayMenu(self._t("menu.remove"), menu)
             for series_config in self._settings.series:
                 action = remove.addAction(series_config.title)
                 action.triggered.connect(
@@ -232,7 +233,7 @@ class MangameTray(QObject):
         return menu
 
     def _language_menu(self, parent: QMenu) -> QMenu:
-        menu = QMenu(self._t("menu.language"), parent)
+        menu = TrayMenu(self._t("menu.language"), parent)
         group = QActionGroup(menu)
         group.setExclusive(True)
 
