@@ -35,7 +35,7 @@ from PySide6.QtWidgets import (
     QDialogButtonBox,
     QFileDialog,
     QFormLayout,
-    QGroupBox,
+    QFrame,
     QHBoxLayout,
     QHeaderView,
     QLabel,
@@ -62,8 +62,41 @@ PREVIEW_PAD = 8
 LIGHT_PANEL = "#F2F2F2"
 DARK_PANEL = "#1B1B1B"
 
+#: Width of one swatch, and so of the column under it. Without the group box
+#: that used to hold the previews, the captions decided how wide each cell was
+#: and the row came out ragged. The height is reserved for the same reason:
+#: so picking a picture fills the row in rather than pushing the page down.
+PREVIEW_WIDTH = 2 * (PREVIEW_ICON + 2 * PREVIEW_PAD)
+PREVIEW_HEIGHT = PREVIEW_ICON + 2 * PREVIEW_PAD
+
 #: Slack around an emblem picker so its longest entry is never clipped.
 COMBO_MARGIN = 16
+
+#: Content insets. Three of them used to stack — the dialog's own layout, the
+#: tab pane's frame and each page's layout — putting 24px between a control and
+#: the window edge. The pages now sit flush inside a frameless tab widget, so
+#: this is the only margin left, and it is the one the tab labels align to.
+PAGE_MARGIN = 12
+PAGE_SPACING = 8
+
+
+def heading(text: str, parent: QWidget) -> QLabel:
+    """A section label: weight instead of a box.
+
+    Qt's group boxes draw a frame that Fusion keeps even when the box is asked
+    to be flat, and another frame is precisely what this window was trying to
+    lose. A bold line reads as a group perfectly well without one.
+    """
+    label = QLabel(text, parent)
+    font = label.font()
+    font.setBold(True)
+    label.setFont(font)
+    return label
+
+
+def flatten(view: QAbstractItemView) -> None:
+    """Strip a view's sunken frame so it sits on the page, not in a well."""
+    view.setFrameShape(QFrame.Shape.NoFrame)
 
 
 def file_filter(label: str) -> str:
@@ -93,8 +126,8 @@ def split_preview(image: QImage) -> QImage:
     Returns an image rather than a pixmap so the composition can be checked
     without a running application; the widget wraps it at the last moment.
     """
-    width = 2 * (PREVIEW_ICON + 2 * PREVIEW_PAD)
-    height = PREVIEW_ICON + 2 * PREVIEW_PAD
+    width = PREVIEW_WIDTH
+    height = PREVIEW_HEIGHT
     canvas = QImage(width, height, QImage.Format.Format_ARGB32)
 
     painter = QPainter(canvas)
@@ -151,6 +184,7 @@ class SettingsDialog(QDialog):
         self.setMinimumWidth(480)
 
         self._tabs = QTabWidget(self)
+        self._tabs.setDocumentMode(True)
         self._tabs.addTab(self._build_general(), self._t("dialog.settings.tab.general"))
         self._tabs.addTab(self._build_manga(), self._t("dialog.settings.tab.manga"))
         self._tabs.addTab(self._build_artwork(), self._t("dialog.settings.tab.artwork"))
@@ -159,6 +193,8 @@ class SettingsDialog(QDialog):
         buttons.rejected.connect(self.reject)
 
         layout = QVBoxLayout(self)
+        layout.setContentsMargins(PAGE_MARGIN, PAGE_MARGIN, PAGE_MARGIN, PAGE_MARGIN)
+        layout.setSpacing(PAGE_SPACING)
         layout.addWidget(self._tabs, 1)
         layout.addWidget(buttons)
 
@@ -194,6 +230,8 @@ class SettingsDialog(QDialog):
         hint.setEnabled(False)
 
         form = QFormLayout(page)
+        form.setContentsMargins(0, PAGE_SPACING, 0, 0)
+        form.setSpacing(PAGE_SPACING)
         form.addRow(self._t("dialog.settings.language"), self._language)
         form.addRow("", hint)
         form.addRow(self._notifications)
@@ -213,7 +251,10 @@ class SettingsDialog(QDialog):
         self._series.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self._series.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self._series.setIconSize(QSize(20, 20))
+        self._series.setShowGrid(False)
+        flatten(self._series)
         self._series.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        self._series.horizontalHeader().setHighlightSections(False)
         self._series.itemChanged.connect(self._on_series_item_changed)
         self._series.itemSelectionChanged.connect(self._on_series_selection)
 
@@ -234,6 +275,8 @@ class SettingsDialog(QDialog):
         row.addWidget(self._remove)
 
         layout = QVBoxLayout(page)
+        layout.setContentsMargins(0, PAGE_SPACING, 0, 0)
+        layout.setSpacing(PAGE_SPACING)
         layout.addWidget(self._series, 1)
         layout.addWidget(hint)
         layout.addLayout(row)
@@ -266,19 +309,25 @@ class SettingsDialog(QDialog):
         self._tone.currentIndexChanged.connect(self.update_preview)
 
         self._previews: dict[IconState, QLabel] = {}
-        preview_box = QGroupBox(self._t("dialog.settings.art.preview"), page)
-        preview_row = QHBoxLayout(preview_box)
+        preview_row = QHBoxLayout()
+        preview_row.setSpacing(PAGE_SPACING)
         for state in IconState:
             cell = QVBoxLayout()
-            swatch = QLabel(preview_box)
+            cell.setSpacing(2)
+            swatch = QLabel(page)
             swatch.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            caption = QLabel(self._t(f"state.{state.value}"), preview_box)
+            swatch.setFixedWidth(PREVIEW_WIDTH)
+            swatch.setMinimumHeight(PREVIEW_HEIGHT)
+            caption = QLabel(self._t(f"state.{state.value}"), page)
             caption.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            caption.setFixedWidth(PREVIEW_WIDTH)
+            caption.setWordWrap(True)
             caption.setEnabled(False)
             cell.addWidget(swatch)
             cell.addWidget(caption)
             preview_row.addLayout(cell)
             self._previews[state] = swatch
+        preview_row.addStretch(1)
 
         self._import = QPushButton(self._t("dialog.settings.art.import"), page)
         self._import.setEnabled(False)
@@ -289,18 +338,21 @@ class SettingsDialog(QDialog):
 
         self._installed = QListWidget(page)
         self._installed.setMaximumHeight(90)
+        flatten(self._installed)
         self._installed.itemSelectionChanged.connect(self._on_installed_selection)
 
         self._discard = QPushButton(self._t("dialog.settings.art.remove"), page)
         self._discard.setEnabled(False)
         self._discard.clicked.connect(self._on_discard)
 
-        installed_box = QGroupBox(self._t("dialog.settings.art.yours"), page)
-        installed_layout = QHBoxLayout(installed_box)
-        installed_layout.addWidget(self._installed, 1)
-        installed_layout.addWidget(self._discard, 0, Qt.AlignmentFlag.AlignTop)
+        installed_row = QHBoxLayout()
+        installed_row.setSpacing(PAGE_SPACING)
+        installed_row.addWidget(self._installed, 1)
+        installed_row.addWidget(self._discard, 0, Qt.AlignmentFlag.AlignTop)
 
         form = QFormLayout()
+        form.setContentsMargins(0, 0, 0, 0)
+        form.setSpacing(PAGE_SPACING)
         form.addRow(self._t("dialog.settings.art.image"), picker)
         form.addRow(self._t("dialog.settings.art.name"), self._name)
         form.addRow(self._t("dialog.settings.art.tone"), self._tone)
@@ -310,11 +362,15 @@ class SettingsDialog(QDialog):
         actions.addWidget(self._import)
 
         layout = QVBoxLayout(page)
+        layout.setContentsMargins(0, PAGE_SPACING, 0, 0)
+        layout.setSpacing(PAGE_SPACING)
         layout.addLayout(form)
-        layout.addWidget(preview_box)
+        layout.addWidget(heading(self._t("dialog.settings.art.preview"), page))
+        layout.addLayout(preview_row)
         layout.addLayout(actions)
         layout.addWidget(self._status)
-        layout.addWidget(installed_box)
+        layout.addWidget(heading(self._t("dialog.settings.art.yours"), page))
+        layout.addLayout(installed_row)
         layout.addStretch(1)
         return page
 

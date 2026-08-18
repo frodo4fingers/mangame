@@ -255,6 +255,14 @@ or a display. Two rules make that loop safe:
 - Echoing saved settings back in is guarded, or the echo re-enters as a fresh
   edit and loops.
 
+The chrome is flat, and mostly by subtraction. Qt stacks three insets by
+default — the dialog's layout, the tab widget's pane frame and each page's
+layout — which put 24px between every control and the window edge. Document
+mode drops the pane, the pages carry no horizontal margin of their own, and the
+dialog's single margin is the one the tab labels already align to. Group boxes
+are labels instead: Fusion draws a box's frame even when the box is asked to be
+flat, and another frame is exactly what was being removed.
+
 Threading: `PollWorker` and `SearchWorker` are `QThread`s that each run their
 own asyncio loop and open their **own** SQLite connection (connections are not
 shareable across threads; WAL makes concurrent use safe). `PollWorker` re-reads

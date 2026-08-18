@@ -216,3 +216,23 @@
 - **Rule**: Where an argument is optional and inferable, omit it. Qt derives the
   format from the file suffix, which keeps both the checker and the runtime
   happy.
+
+### Padding you did not write is still padding you shipped
+- **What**: The settings tabs looked heavily inset. Nobody had set a margin:
+  Qt's defaults stacked three of them — the dialog layout (11), the tab pane
+  frame (2) and each page's layout (11) — for 24px on every edge.
+- **Why**: Each default is reasonable alone and they are invisible in the code,
+  so nesting containers quietly compounds them.
+- **Rule**: Measure before tuning — map a child widget's origin into the window
+  and read the number. Then let exactly one container own the margin and zero
+  the rest, and assert the leftmost *control*, not the page origin: a test that
+  measures the container passes happily while the padding inside it returns.
+
+### `setFlat` is a hint, and Fusion declines it
+- **What**: `QGroupBox.setFlat(True)` was supposed to drop the frame for the
+  flat look; rendered side by side with a boxed one, Fusion draws them almost
+  identically.
+- **Why**: Style hints are advisory, and each style decides what it honours.
+- **Rule**: Verify a styling call by rendering it and comparing, not by reading
+  the docs. Where a style ignores the hint, drop the widget instead of fighting
+  it — a bold label groups content perfectly well without a box.

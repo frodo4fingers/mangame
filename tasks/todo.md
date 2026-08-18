@@ -247,3 +247,18 @@ and, on a panel at a screen edge, no longer even displayable. Everything with a
 - Kagurabachi and Sakamoto Days now show distinct pink "K" and green "S"
   badges where both previously showed the same book.
 - The stale-copy regression tests were confirmed to fail against the old code.
+
+### Follow-up: flat chrome for the settings dialog
+
+- [x] Measured the inset before touching it: dialog layout 11 + tab pane frame
+      2 + page layout 11 = 24px around every control. Now 12.
+- [x] `setDocumentMode(True)` removes the pane, so the tab labels and the page
+      content align to the same edge.
+- [x] Group boxes → bold labels. Fusion draws a flat group box's frame anyway,
+      which was verified by rendering both.
+- [x] Table and list frames removed, grid lines off, header sections no longer
+      highlight.
+- [x] Preview cells given a fixed width and a reserved height — without the box
+      the captions decided the widths, so the row was ragged and jumped when a
+      picture was chosen. German wraps to two lines and still lines up.
+- [x] 6 regression tests, each confirmed to fail against the previous layout.

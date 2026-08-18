@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QImage, QPainter
-from PySide6.QtWidgets import QComboBox, QTableWidgetItem
+from PySide6.QtWidgets import QComboBox, QFrame, QGroupBox, QLabel, QTableWidgetItem, QWidget
 
 from mangame.domain.models import IconState
 from mangame.i18n.catalog import Translator
@@ -21,9 +21,13 @@ from mangame.ui import artwork, emblems
 from mangame.ui.settings_dialog import (
     DARK_PANEL,
     LIGHT_PANEL,
+    PAGE_MARGIN,
+    PREVIEW_HEIGHT,
+    PREVIEW_WIDTH,
     SettingsDialog,
     emblem_choices,
     file_filter,
+    heading,
     split_preview,
     suggested_name,
 )
@@ -401,3 +405,59 @@ class TestArtworkTab:
         dialog._import.click()
 
         assert seen.calls == []
+
+
+class TestFlatLayout:
+    def test_a_control_sits_one_margin_from_the_window_edge(self, dialog: SettingsDialog) -> None:
+        # Three insets used to stack here: the dialog's layout, the tab pane's
+        # frame and the page's own layout, putting 24px around everything.
+        dialog.resize(560, 520)
+        dialog.show()
+
+        for index in range(dialog._tabs.count()):
+            dialog._tabs.setCurrentIndex(index)
+            page = dialog._tabs.currentWidget()
+            controls = [w for w in page.findChildren(QWidget) if w.isVisible()]
+            leftmost = min(w.mapTo(dialog, w.rect().topLeft()).x() for w in controls)
+            assert leftmost == PAGE_MARGIN, dialog._tabs.tabText(index)
+
+    def test_the_tab_pane_draws_no_frame(self, dialog: SettingsDialog) -> None:
+        # Document mode is what removes the pane; without it the pages are
+        # inset again and the margin above is measured from the wrong place.
+        assert dialog._tabs.documentMode() is True
+
+    def test_the_views_have_no_sunken_border(self, dialog: SettingsDialog) -> None:
+        assert dialog._series.frameShape() == QFrame.Shape.NoFrame
+        assert dialog._installed.frameShape() == QFrame.Shape.NoFrame
+
+    def test_sections_are_titled_by_weight_rather_than_a_box(self, dialog: SettingsDialog) -> None:
+        # Fusion keeps drawing a group box's frame even when asked for a flat
+        # one, so the artwork tab uses labels and must not grow boxes again.
+        assert dialog.findChildren(QGroupBox) == []
+        titles = {label.text() for label in dialog.findChildren(QLabel) if label.font().bold()}
+        assert titles == {
+            dialog._t("dialog.settings.art.preview"),
+            dialog._t("dialog.settings.art.yours"),
+        }
+
+    def test_a_heading_is_the_only_thing_the_helper_changes(self) -> None:
+        parent = QWidget()
+        label = heading("Preview", parent)
+
+        assert label.text() == "Preview"
+        assert label.font().bold() is True
+        assert label.parent() is parent
+
+    def test_the_preview_row_keeps_its_shape_before_and_after_a_picture(
+        self, dialog: SettingsDialog, tmp_path: Path
+    ) -> None:
+        # Every caption is a different length, and one of them wraps in German;
+        # without a reserved cell the row is ragged and jumps when it fills in.
+        dialog.show()
+        empty = [(w.width(), w.height()) for w in dialog._previews.values()]
+
+        dialog.set_source(picture(tmp_path / "a.png"))
+
+        assert {w.width() for w in dialog._previews.values()} == {PREVIEW_WIDTH}
+        assert all(w.height() >= PREVIEW_HEIGHT for w in dialog._previews.values())
+        assert [(w.width(), w.height()) for w in dialog._previews.values()] == empty
