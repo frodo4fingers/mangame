@@ -56,10 +56,10 @@ class TestTranslator:
 
 class TestEmblems:
     def test_the_bundled_artwork_is_shipped(self) -> None:
-        assert "strawhat" in emblems.available_emblems()
+        assert "onepiece" in emblems.available_emblems()
         assert "book" in emblems.available_emblems()
 
-    @pytest.mark.parametrize("emblem", ["strawhat", "book"])
+    @pytest.mark.parametrize("emblem", ["onepiece", "book"])
     @pytest.mark.parametrize("state", list(IconState))
     def test_every_emblem_has_artwork_for_every_state(self, emblem: str, state: IconState) -> None:
         found = emblems._find(emblem, state)
@@ -68,7 +68,7 @@ class TestEmblems:
 
     def test_bundled_artwork_covers_the_sizes_a_panel_may_ask_for(self) -> None:
         for state in IconState:
-            directory = emblems.BUNDLED_DIR / "strawhat" / state.value
+            directory = emblems.BUNDLED_DIR / "onepiece" / state.value
             present = {int(p.stem) for p in directory.glob("*.png") if p.stem.isdigit()}
             assert set(emblems.SIZES) <= present
 

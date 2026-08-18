@@ -24,7 +24,7 @@ def series(**overrides: object) -> TrackedSeries:
     base: dict[str, object] = {
         "key": "one-piece",
         "title": "One Piece",
-        "emblem": "strawhat",
+        "emblem": "onepiece",
         "cadence": WEEKLY,
         "status": PublicationStatus.ONGOING,
     }

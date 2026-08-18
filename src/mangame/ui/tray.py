@@ -41,7 +41,7 @@ REFRESH_MS = 60_000
 NOTIFY_MS = 8_000
 
 #: Titles we ship real artwork for. Everything else gets a generated monogram.
-EMBLEM_HINTS: dict[str, str] = {"one piece": "strawhat"}
+EMBLEM_HINTS: dict[str, str] = {"one piece": "onepiece"}
 
 #: Sources worth attaching automatically when a series is added.
 PREFERRED_SOURCES = ("mangadex", "anilist", "mangaupdates")
@@ -133,7 +133,7 @@ class MangameTray(QObject):
 
         state = aggregate([s.icon_state for s in snapshots])
         icon = self._ensure_icon("__all__")
-        icon.setIcon(icon_for("strawhat", state, "mangame"))
+        icon.setIcon(icon_for("onepiece", state, "mangame"))
         icon.setToolTip("\n".join(s.tooltip for s in snapshots) or self._t("menu.no_series"))
         icon.setContextMenu(self._build_menu(icon, None))
         icon.show()

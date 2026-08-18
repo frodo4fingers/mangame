@@ -179,7 +179,7 @@ class TestSettings:
                 config_store.SeriesConfig(
                     key="one-piece",
                     title="One Piece",
-                    emblem="strawhat",
+                    emblem="onepiece",
                     sources={"mangadex": "uuid-here"},
                 )
             ],

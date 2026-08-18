@@ -87,7 +87,7 @@ emblems/<name>/<ready|due|break>/<16|18|20|22|24|32|36|44|48|64>.png
 ```
 
 then set `"emblem": "<name>"` on the series. User artwork takes priority over
-the bundled sets, so you can override `strawhat` or `book` without touching the
+the bundled sets, so you can override `onepiece` or `book` without touching the
 installation.
 
 Any series whose emblem has no artwork gets a generated monogram badge instead —

@@ -90,7 +90,7 @@ def settings_with(**overrides: object) -> Settings:
     series: dict[str, object] = {
         "key": "one-piece",
         "title": "One Piece",
-        "emblem": "strawhat",
+        "emblem": "onepiece",
         "sources": {"fake": "ref-1"},
     }
     series.update(overrides)

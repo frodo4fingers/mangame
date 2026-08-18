@@ -76,14 +76,16 @@ PALETTES: tuple[Palette, ...] = (
 
 SVG_HEADER = '<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">'
 
-# Straw boater hat: wide brim ellipse + low domed crown + ribbon band.
+# The "onepiece" emblem, drawn as a generic straw boater hat: wide brim ellipse
+# + low domed crown + ribbon band. Emblems are named after the series they are
+# hinted for, not after the shape.
 _CROWN = "M14 45 C14 27 19 15 32 15 C45 15 50 27 50 45 Z"
 _BRIM = (
     "M32 37 C47 37 58 40.5 58 45.5 C58 50.5 47 54 32 54 C17 54 6 50.5 6 45.5 C6 40.5 17 37 32 37 Z"
 )
 
 
-def _strawhat(p: Palette) -> str:
+def _onepiece(p: Palette) -> str:
     return f"""{SVG_HEADER}
   <defs><clipPath id="crown"><path d="{_CROWN}"/></clipPath></defs>
   <g stroke="{p.line}" stroke-opacity="{p.line_opacity}" stroke-width="3"
@@ -116,7 +118,7 @@ def _book(p: Palette) -> str:
 """
 
 
-EMBLEMS = {"strawhat": _strawhat, "book": _book}
+EMBLEMS = {"onepiece": _onepiece, "book": _book}
 
 
 def _run(cmd: list[str]) -> None:
