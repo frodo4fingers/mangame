@@ -154,3 +154,49 @@ count as ready. Scope narrowed to English, Spanish and German.
 - `availableTranslatedLanguages` lists 24 codes including both Spanish variants.
 - MangaUpdates returns identical `total_hits` with and without a `lang`
   parameter, which is what the English-only declaration rests on.
+
+## Follow-up: one dialog for search and add (2026-08)
+
+Adding a manga was a chain of modal boxes: type a query, wait blind, then pick
+from a combo box — and when nothing was found, a combo box containing a single
+empty string stood in for an error message. Refining a search meant starting
+again from the menu.
+
+- [x] `ui/add_dialog.py` — one window with the query field, the results list,
+      a status line and Add/Cancel.
+- [x] Results grouped by title, showing which sources back each series, so what
+      Add links is visible rather than surprising.
+- [x] Series already tracked are greyed out and labelled instead of silently
+      doing nothing.
+- [x] Empty and failed searches say so in the status line, in place of the fake
+      combo box.
+- [x] The search only asks sources that serve the reading language.
+- [x] Search threads are held until Qt reports them finished, and waited on at
+      shutdown.
+- [x] `slugify` moved to `store/config.series_key()`, so the dialog decides
+      "already tracked" with the identity the store actually stores under.
+- [x] 40 new tests; README and architecture doc updated.
+
+### Bugs this removed
+
+1. **Results were mapped back by label string.** `labels.index(chosen)` picked
+   the *first* match with that text, so two sources returning the same title
+   and year could attach the wrong reference. Rows now carry their index.
+2. **A dropped QThread reference.** `self._search` was overwritten by each new
+   search; a thread collected while still running takes the process with it.
+3. **The no-results dialog was a lie.** `QInputDialog.getItem(..., [""])` is a
+   combo box, not a message, and it offered an empty string as a choice.
+4. **"Already tracked" was decided by title.** Tracking dedupes by slug, so a
+   series stored as "Kagurabachi!" left the search hit "Kagurabachi" looking
+   addable — and Add then did nothing at all.
+
+### Verified, not assumed
+
+- Live search for "one piece" returns 41 grouped rows; One Piece itself is one
+  row backed by mangadex · mangaupdates · anilist, greyed when already tracked.
+- End to end through the real tray: adding Kagurabachi in English links all
+  three sources; in German it links mangadex + anilist and the dialog is in
+  German. Config written, tray icon created, in both cases.
+- The empty state shows the query back with Add disabled and no rows.
+- With "Kagurabachi!" tracked, the search hit "Kagurabachi" comes back greyed
+  and unselectable, and selection skips to the next row.

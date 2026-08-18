@@ -8,6 +8,7 @@ and hand-editable either way.
 
 import json
 import os
+import re
 import tempfile
 from pathlib import Path
 from typing import Annotated
@@ -25,6 +26,18 @@ snapshots — only ever sees a canonical code. A hand-edited ``"pt-BR"`` or a
 language dropped from a later release therefore degrades to something the
 sources can serve instead of silently matching no chapters at all.
 """
+
+
+def series_key(title: str) -> str:
+    """The identity a tracked series is stored under.
+
+    Lives with the model that owns ``key`` rather than in the tray, because
+    "do we already track this?" has to be asked the same way in both the add
+    dialog and the code that writes the entry — otherwise Add looks available
+    and then quietly does nothing.
+    """
+    slug = re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")
+    return slug or "series"
 
 
 class SeriesConfig(BaseModel):

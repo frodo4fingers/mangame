@@ -238,3 +238,26 @@ class TestSettings:
         )
         assert settings.language_for(settings.series[0]) == "de"
         assert settings.language_for(settings.series[1]) == "es"
+
+
+class TestSeriesKey:
+    """One title, one key — the add dialog and the store must agree on it."""
+
+    @pytest.mark.parametrize(
+        ("title", "expected"),
+        [
+            ("One Piece", "one-piece"),
+            ("ONE PIECE", "one-piece"),
+            ("One Piece!", "one-piece"),
+            ("  One Piece  ", "one-piece"),
+            ("One Piece: Ace's Story", "one-piece-ace-s-story"),
+            ("Kagurabachi", "kagurabachi"),
+        ],
+    )
+    def test_a_title_becomes_a_slug(self, title: str, expected: str) -> None:
+        assert config_store.series_key(title) == expected
+
+    def test_a_title_with_nothing_sluggable_still_yields_a_key(self) -> None:
+        # A key is a primary key; an empty one would collide with every other.
+        assert config_store.series_key("!!!") == "series"
+        assert config_store.series_key("") == "series"

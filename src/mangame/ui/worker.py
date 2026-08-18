@@ -96,14 +96,15 @@ class PollWorker(QThread):
 
 
 class SearchWorker(QThread):
-    """One-shot series lookup across every searchable source."""
+    """One-shot series lookup across every source that serves the language."""
 
     found = Signal(object)
     """Emitted with ``list[SourceMatch]``."""
 
-    def __init__(self, query: str, limit: int = 12) -> None:
+    def __init__(self, query: str, language: str = "en", limit: int = 12) -> None:
         super().__init__()
         self._query = query
+        self._language = language
         self._limit = limit
 
     def run(self) -> None:
@@ -119,6 +120,11 @@ class SearchWorker(QThread):
         try:
             results: list[SourceMatch] = []
             for source in registry.searchable():
+                # Search and poll have to agree about who is worth asking.
+                # Offering a hit from a source that cannot serve the reading
+                # language would add a series nothing ever reports on.
+                if not source.capabilities.serves(self._language):
+                    continue
                 try:
                     results.extend(
                         await source.search(

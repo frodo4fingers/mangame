@@ -41,6 +41,14 @@ MangaUpdates' `/v1/releases/days` firehose is deliberately *not* used: it return
 roughly nine thousand releases per day, which costs far more than polling the
 handful of series a user actually tracks.
 
+### Search and poll ask the same sources
+
+The add dialog searches only sources that serve the reading language, for the
+same reason the poller skips them: a hit from a source that cannot answer in
+your language would add a series nothing ever reports on. Results are then
+grouped by title — the same normalisation the tray uses to cross-link matches —
+so the row you pick lists exactly the sources that Add will attach.
+
 ### Reading language decides who is asked
 
 The `Language` setting is the language you *read* in, not a label switch. It
@@ -188,9 +196,14 @@ i18n/        reading languages + menu catalogues
 ```
 
 `domain/` is pure: no I/O, no network, and no clock — `now` is always a
-parameter. That is what makes 244 tests run in under three seconds with no
+parameter. That is what makes 271 tests run in under four seconds with no
 network access, and it is why the rules above can be asserted directly rather
 than inferred from behaviour.
+
+The same split is applied inside `ui/`: the parts worth asserting are pulled
+out of the widgets. `menu.fitted_position()` clamps a popup into the work area
+and `add_dialog.group_matches()` decides which rows the add dialog shows, so
+both can be tested without a display.
 
 Threading: `PollWorker` and `SearchWorker` are `QThread`s that each run their
 own asyncio loop and open their **own** SQLite connection (connections are not

@@ -129,3 +129,45 @@
   boundary (adapter on the way in, validator on config load), and keep the
   round trip under test so no code is fetched under one name and stored under
   another.
+
+### A wizard of modal boxes is one dialog wearing a disguise
+- **What**: Adding a manga was `getText` → blind wait → `getItem`, with
+  `getItem(..., [""])` standing in for "nothing found". Every step threw away
+  the previous one's context, so refining a search meant restarting from the
+  menu, and the error state offered an empty string as a choice.
+- **Why**: `QInputDialog` is a shortcut for asking *one* question. A flow that
+  asks, waits, then asks again is a single task, and splitting it across modal
+  boxes loses the state that makes the task recoverable.
+- **Rule**: When two dialogs are always shown in sequence, they are one dialog.
+  Build it as a `QDialog` where the input, the results and the status line stay
+  on screen together, and keep the decision logic (grouping, ranking, what is
+  selectable) in pure functions so it can be tested without a display.
+
+### Never map a selection back by its label
+- **What**: The old results list recovered the chosen match with
+  `matches[labels.index(chosen)]`. Two sources returning the same title and
+  year produce the same label, so the wrong reference could be attached.
+- **Why**: A label is for humans; it is not an identifier and nothing stops it
+  from repeating.
+- **Rule**: Put the index or the object on the item (`Qt.ItemDataRole.UserRole`)
+  and read it back from there.
+
+### A QThread must outlive the last reference you were holding
+- **What**: Each search assigned `self._search`, so starting a second search
+  dropped the first thread's only Python reference while it might still be
+  running — and a collected running QThread takes the process with it.
+- **Why**: Qt owns the thread, Python owns the wrapper, and the wrapper dying
+  first is fatal rather than merely untidy.
+- **Rule**: Keep workers in a set, discard them on `finished`, and wait for
+  them during shutdown.
+
+### Show a thing as unavailable using the identity that makes it unavailable
+- **What**: The add dialog greyed out series it already tracked by comparing
+  titles, but tracking refuses duplicates by slug. A series stored as
+  "Kagurabachi!" left the search hit "Kagurabachi" looking addable, and Add
+  then silently did nothing — the exact failure the greying was added to stop.
+- **Why**: Two normalisations of "the same series" existed in different layers.
+  A disabled state computed from the looser one is decoration, not a guarantee.
+- **Rule**: Derive the affordance from the rule that enforces it. Move the
+  identity function next to the model that owns the key and call it from both
+  sides, rather than reimplementing "close enough" in the UI.

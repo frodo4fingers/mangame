@@ -35,9 +35,27 @@ Deliberately four items:
   `HKCU\...\Run` value on Windows, and a LaunchAgent plist on macOS.
 - **Quit**.
 
-Adding a series searches MangaDex, MangaUpdates and AniList at once and links
-whichever of them recognise it *and can serve your language*, so one series can
-be watched through several sources without any extra configuration.
+## Adding a manga
+
+**Manga ▸ Add manga…** opens one window that does the whole job: type a title,
+hit Enter, pick a result, choose Add. The field, the results and the outcome
+stay on screen, so a search that found the wrong thing is one edit away from
+the right one.
+
+Results are grouped by series rather than listed per source. One row reading
+
+```
+One Piece (1997)
+mangadex · mangaupdates · anilist
+```
+
+is one series found by three sources, and Add links all of them — MangaDex
+supplies chapter times, AniList supplies the hiatus flag, and a series needs
+both to use all three icon states. Anything you already track is greyed out and
+labelled, instead of silently doing nothing when you add it twice.
+
+Only sources that can serve your reading language are searched, so every result
+is one that can actually be tracked.
 
 ## Languages
 

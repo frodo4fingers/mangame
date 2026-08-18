@@ -1,5 +1,6 @@
 """Menu translations, emblem resolution and menu placement — the pure UI bits."""
 
+import re
 from pathlib import Path
 
 import pytest
@@ -50,6 +51,14 @@ class TestTranslator:
     @pytest.mark.parametrize("code", sorted(_CATALOGS))
     def test_no_catalog_invents_keys_english_does_not_have(self, code: str) -> None:
         assert set(_CATALOGS[code]) <= set(_EN)
+
+    @pytest.mark.parametrize("code", sorted(_CATALOGS))
+    def test_every_catalog_uses_the_same_placeholders(self, code: str) -> None:
+        # A translation that renames {count} would raise KeyError at the moment
+        # the dialog tries to show its result count.
+        placeholders = re.compile(r"\{(\w+)\}")
+        for key, text in _CATALOGS[code].items():
+            assert set(placeholders.findall(text)) == set(placeholders.findall(_EN[key])), key
 
     def test_every_catalog_is_offered_in_the_menu(self) -> None:
         assert set(_CATALOGS) <= set(LANGUAGES)

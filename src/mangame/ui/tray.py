@@ -12,12 +12,11 @@ which keeps the top level from growing.
 """
 
 import logging
-import re
 from datetime import UTC, datetime
 
 from PySide6.QtCore import QObject, QTimer, QUrl
 from PySide6.QtGui import QAction, QActionGroup, QDesktopServices
-from PySide6.QtWidgets import QApplication, QInputDialog, QMenu, QSystemTrayIcon
+from PySide6.QtWidgets import QApplication, QDialog, QMenu, QSystemTrayIcon
 
 from mangame.domain.models import IconState, SeriesSnapshot
 from mangame.domain.state import aggregate
@@ -28,8 +27,9 @@ from mangame.service.poller import PollOutcome
 from mangame.sources import registry
 from mangame.sources.base import SourceMatch
 from mangame.store import config
-from mangame.store.config import SeriesConfig, Settings
+from mangame.store.config import SeriesConfig, Settings, series_key
 from mangame.store.db import Database
+from mangame.ui.add_dialog import AddSeriesDialog, SeriesCandidate
 from mangame.ui.emblems import icon_for
 from mangame.ui.menu import TrayMenu
 from mangame.ui.worker import PollWorker, SearchWorker
@@ -47,11 +47,6 @@ EMBLEM_HINTS: dict[str, str] = {"one piece": "onepiece"}
 
 #: Sources worth attaching automatically when a series is added.
 PREFERRED_SOURCES = ("mangadex", "anilist", "mangaupdates")
-
-
-def slugify(title: str) -> str:
-    slug = re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")
-    return slug or "series"
 
 
 def emblem_for(title: str) -> str:
@@ -76,7 +71,8 @@ class MangameTray(QObject):
         self._icons: dict[str, QSystemTrayIcon] = {}
         self._menus: dict[int, QMenu] = {}
         self._last_state: dict[str, IconState] = {}
-        self._search: SearchWorker | None = None
+        self._searches: set[SearchWorker] = set()
+        self._dialog: AddSeriesDialog | None = None
 
         self._worker = PollWorker()
         self._worker.outcomes.connect(self._on_outcomes)
@@ -96,6 +92,8 @@ class MangameTray(QObject):
         self._timer.stop()
         self._worker.stop()
         self._worker.wait(5_000)
+        for search in tuple(self._searches):
+            search.wait(5_000)
         for icon in self._icons.values():
             icon.hide()
         self._db.close()
@@ -304,68 +302,57 @@ class MangameTray(QObject):
     # ------------------------------------------------------------ add series
 
     def _add_series(self) -> None:
-        query, accepted = QInputDialog.getText(
-            None, self._t("dialog.add.title"), self._t("dialog.add.prompt")
-        )
-        if not accepted or not query.strip():
-            return
+        """Open the one window that searches and adds.
 
-        self._search = SearchWorker(query.strip())
-        self._search.found.connect(self._on_search_results)
-        self._search.start()
+        Modal on purpose: ``exec()`` runs a nested event loop, which is what
+        delivers the search thread's queued signal while the dialog is up.
+        """
+        dialog = AddSeriesDialog(self._t, [s.key for s in self._settings.series])
+        dialog.search_requested.connect(lambda query: self._run_search(dialog, query))
+        self._dialog = dialog
+        try:
+            accepted = dialog.exec() == QDialog.DialogCode.Accepted
+        finally:
+            self._dialog = None
 
-    def _on_search_results(self, matches: list[SourceMatch]) -> None:
-        if not matches:
-            QInputDialog.getItem(
-                None,
-                self._t("dialog.add.title"),
-                self._t("dialog.add.none"),
-                [""],
-                editable=False,
-            )
-            return
+        if accepted and dialog.chosen is not None:
+            self._track(dialog.chosen)
 
-        labels = [self._label_for(m) for m in matches]
-        chosen, accepted = QInputDialog.getItem(
-            None,
-            self._t("dialog.add.title"),
-            self._t("dialog.add.prompt"),
-            labels,
-            editable=False,
-        )
-        if not accepted:
-            return
-        self._track(matches[labels.index(chosen)], matches)
+    def _run_search(self, dialog: AddSeriesDialog, query: str) -> None:
+        worker = SearchWorker(query, self._settings.language)
+        # Held until Qt says the thread finished. A QThread collected while it
+        # is still running takes the process with it, and the dialog can be
+        # closed — or searched again — before a slow source has answered.
+        self._searches.add(worker)
+        worker.found.connect(lambda matches: self._on_search_results(dialog, matches))
+        worker.finished.connect(lambda: self._searches.discard(worker))
+        worker.start()
 
-    @staticmethod
-    def _label_for(match: SourceMatch) -> str:
-        year = f" ({match.year})" if match.year else ""
-        return f"{match.title}{year}  ·  {match.source_id}"
+    def _on_search_results(self, dialog: AddSeriesDialog, matches: list[SourceMatch]) -> None:
+        if self._dialog is not dialog:
+            return  # the dialog was closed while the search was in flight
+        dialog.show_results(matches)
 
-    def _track(self, chosen: SourceMatch, everything: list[SourceMatch]) -> None:
-        """Attach the chosen match plus any same-titled match from other sources.
+    def _track(self, candidate: SeriesCandidate) -> None:
+        """Attach every source that offered this series and can serve it.
 
         Cross-linking matters: MangaDex supplies chapter times while AniList
-        supplies the hiatus flag, and a series needs both to use all three
-        icon states. Sources that cannot speak the reading language are left
-        out, because they could only ever answer about somebody else's release.
+        supplies the hiatus flag, and a series needs both to use all three icon
+        states. The dialog groups matches by title, so the sources linked here
+        are exactly the ones the chosen row listed.
         """
-        key = slugify(chosen.title)
+        chosen = candidate.primary
+        key = series_key(chosen.title)
         if any(s.key == key for s in self._settings.series):
             return
 
         language = self._settings.language
         sources = {chosen.source_id: chosen.ref}
-        normalised = chosen.title.strip().lower()
-        for candidate in everything:
-            if candidate.source_id in sources:
+        for match in candidate.matches:
+            if match.source_id in sources or match.source_id not in PREFERRED_SOURCES:
                 continue
-            if candidate.source_id not in PREFERRED_SOURCES:
-                continue
-            if not registry.serves(candidate.source_id, language):
-                continue
-            if candidate.title.strip().lower() == normalised:
-                sources[candidate.source_id] = candidate.ref
+            if registry.serves(match.source_id, language):
+                sources[match.source_id] = match.ref
 
         entry = SeriesConfig(
             key=key,
