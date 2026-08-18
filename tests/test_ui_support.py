@@ -17,13 +17,13 @@ class TestTranslator:
         assert Translator("en")("menu.quit") == "Quit mangame"
 
     def test_a_translated_language_is_used(self) -> None:
-        assert Translator("de")("menu.language") == "Sprache"
+        assert Translator("de")("dialog.settings.language") == "Lesesprache"
 
     def test_an_unknown_language_falls_back_to_english(self) -> None:
         assert Translator("kl")("menu.quit") == Translator("en")("menu.quit")
 
     def test_language_codes_are_matched_case_insensitively(self) -> None:
-        assert Translator("DE")("menu.language") == "Sprache"
+        assert Translator("DE")("dialog.settings.language") == "Lesesprache"
 
     def test_conventional_region_casing_is_understood(self) -> None:
         assert Translator("es-MX").language == "es"
@@ -95,6 +95,44 @@ class TestEmblems:
     def test_user_artwork_takes_priority_over_bundled(self, tmp_path: Path) -> None:
         assert emblems.emblem_roots()[0] != emblems.BUNDLED_DIR
         assert emblems.BUNDLED_DIR in emblems.emblem_roots()
+
+    def test_the_monogram_is_not_offered_as_artwork(self) -> None:
+        assert emblems.MONOGRAM_EMBLEM not in emblems.available_emblems()
+        assert emblems.selectable_emblems()[0] == emblems.MONOGRAM_EMBLEM
+
+
+class TestMonogramFallback:
+    """A series without artwork must still look like itself.
+
+    ``emblem_for`` hands every series but One Piece the name ``monogram``, and
+    that used to resolve through a "book" fallback — so every one of them wore
+    the identical stand-in and the generated badge was unreachable.
+    """
+
+    @staticmethod
+    def rendered(emblem: str, title: str, state: IconState = IconState.READY) -> bytes:
+        image = emblems.icon_for(emblem, state, title).pixmap(64, 64).toImage()
+        return bytes(image.constBits())
+
+    def test_asking_for_a_monogram_does_not_give_the_book(self, qapp: object) -> None:
+        assert self.rendered("monogram", "Kagurabachi") != self.rendered("book", "Kagurabachi")
+
+    def test_two_series_without_artwork_look_different(self, qapp: object) -> None:
+        assert self.rendered("monogram", "Kagurabachi") != self.rendered("monogram", "Sakamoto")
+
+    def test_artwork_that_was_deleted_falls_back_to_the_monogram(self, qapp: object) -> None:
+        assert self.rendered("no-such-emblem", "Kagurabachi") == self.rendered(
+            "monogram", "Kagurabachi"
+        )
+
+    @pytest.mark.parametrize("state", list(IconState))
+    def test_each_state_still_looks_different(self, state: IconState, qapp: object) -> None:
+        others = [s for s in IconState if s is not state]
+        mine = self.rendered("monogram", "Kagurabachi", state)
+        assert all(mine != self.rendered("monogram", "Kagurabachi", other) for other in others)
+
+    def test_real_artwork_is_still_preferred(self, qapp: object) -> None:
+        assert self.rendered("onepiece", "One Piece") != self.rendered("monogram", "One Piece")
 
 
 class TestMenuFitting:

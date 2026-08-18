@@ -184,10 +184,39 @@ Two properties matter more than the exact numbers:
   and replayed, so most polls are a 304 that costs almost nothing. That is what
   makes the 10-minute hot window affordable in the first place.
 
-## 6. Layers
+## 6. Three states from one picture
+
+`ui/artwork.py`. Bundled emblems are drawn three times from three palettes;
+anything a user imports is one picture, so *due* and *break* have to be derived.
+
+- **Greyscale** leans on Qt's `Grayscale8` conversion, which is a gamma-correct
+  Rec. 709 luminance — it linearises, weights, then re-encodes — and then
+  remaps the result into a mid band (0.34–0.86). Plain luminance would be
+  honest and useless: dark artwork would come out almost black, which is
+  exactly what *break* looks like, and at 16 pixels there is no detail left to
+  distinguish them by. The band is what guarantees the states are told apart.
+- **Silhouette** flattens everything opaque to one tone and rings it in the
+  opposite one, matching the palettes `tools/gen_icons.py` uses. A dark
+  silhouette vanishes on a dark panel and a light one vanishes on a light
+  panel, so the rim is what makes either choice survive the other background.
+  It is grown by stamping the alpha mask across a disc of offsets and punching
+  the original shape back out — draw calls rather than a pixel loop — and the
+  artwork is inset by exactly the rim width so the halo is never clipped.
+
+Everything works on `QImage`, which needs no display, no `QApplication` and no
+window system. That is what keeps the live preview cheap (a full 12-size,
+3-state import takes under 200 ms) and lets the pixel assertions in
+`tests/test_artwork.py` be the real thing.
+
+Missing artwork falls back to the **monogram**, never to another emblem. A
+generated badge still says which series it is; a shared stand-in would make
+every untouched series look identical — which is precisely the bug that
+existed while `"monogram"` silently resolved to the bundled `book`.
+
+## 7. Layers
 
 ```
-ui/          Qt tray, menus, worker threads      ← the only Qt-aware code
+ui/          Qt tray, dialogs, artwork, worker threads   ← the only Qt-aware code
 service/     library, poller, autostart          ← orchestration
 sources/     adapters + HTTP plumbing            ← the only network code
 store/       SQLite + JSON settings              ← the only persistence
@@ -196,14 +225,35 @@ i18n/        reading languages + menu catalogues
 ```
 
 `domain/` is pure: no I/O, no network, and no clock — `now` is always a
-parameter. That is what makes 271 tests run in under four seconds with no
+parameter. That is what makes 380 tests run in under seven seconds with no
 network access, and it is why the rules above can be asserted directly rather
 than inferred from behaviour.
 
 The same split is applied inside `ui/`: the parts worth asserting are pulled
-out of the widgets. `menu.fitted_position()` clamps a popup into the work area
-and `add_dialog.group_matches()` decides which rows the add dialog shows, so
-both can be tested without a display.
+out of the widgets. `menu.fitted_position()` clamps a popup into the work area,
+`add_dialog.group_matches()` decides which rows the add dialog shows, and every
+transform in `artwork.py` is a plain function over images. The dialogs
+themselves are driven for real, on Qt's offscreen platform, because their
+interesting failures are wiring failures — a checkbox connected to nothing
+looks fine in a screenshot.
+
+### Menus hold verbs, dialogs hold values
+
+The tray menu was once three levels deep (Manga ▸ Stop tracking ▸ a series).
+That is slow to reach, and on a panel pinned to a screen edge Qt would size the
+popup against the screen rather than the work area and run it off the display.
+`menu.fitted_position()` clamps that, but the real fix was structural: the menu
+now lists only actions, and everything with a value lives in
+`ui/settings_dialog.py`. A flat list of verbs cannot overflow.
+
+The dialogs own no services. They emit what the user asked for and are handed
+settings back, which is what lets them be tested without a poller, a database
+or a display. Two rules make that loop safe:
+
+- A dialog updates **its own copy** as it emits. Emitting from the copy it
+  opened with would mean a second edit silently reverts the first.
+- Echoing saved settings back in is guarded, or the echo re-enters as a fresh
+  edit and loops.
 
 Threading: `PollWorker` and `SearchWorker` are `QThread`s that each run their
 own asyncio loop and open their **own** SQLite connection (connections are not

@@ -200,3 +200,50 @@ again from the menu.
 - The empty state shows the query back with Add disabled and no rows.
 - With "Kagurabachi!" tracked, the search hit "Kagurabachi" comes back greyed
   and unselectable, and selection skips to the next row.
+
+## Settings dialog and artwork import
+
+The context menu had grown three levels deep and was no longer maintainable —
+and, on a panel at a screen edge, no longer even displayable. Everything with a
+*value* moved into one window; the menu kept the verbs.
+
+- [x] `ui/artwork.py`: PNG/SVG → the three icon states.
+      - greyscale via Qt's gamma-correct `Grayscale8`, remapped into a mid band
+        so dark artwork cannot come out looking like a break
+      - silhouette in a dark or a light tone, each ringed in the opposite one,
+        with the artwork inset by exactly the rim it grows
+      - install/uninstall into the user emblem directory, invalidating the
+        memoised `icon_for`
+- [x] `ui/settings_dialog.py`: General / Manga / Artwork, applying as you go.
+- [x] Tray menu flattened to verbs only: header, Open, Mark read, Add, Check
+      now, Settings…, Quit. No submenus at all.
+- [x] `Settings.with_series_change()` / `.without_series()`, so the tray and the
+      dialog edit the series list the same way.
+- [x] 96 new tests, including the dialogs driven for real on Qt's offscreen
+      platform. README and architecture doc updated.
+
+### Bugs this removed
+
+1. **The generated monogram was unreachable.** `icon_for` fell back to the
+   bundled `book` before it ever reached the monogram, and `emblem_for()` hands
+   every series but One Piece the name `"monogram"` — so every one of them wore
+   the identical book icon. Missing artwork now falls back to the monogram, and
+   `book` is just another emblem you can pick.
+2. **A dialog emitting from a stale copy.** Each change was built from the
+   settings the dialog opened with, so turning off notifications and then
+   changing an emblem silently turned notifications back on.
+3. **A truncated emblem column.** The picker was sized by the header, clipping
+   "Generated badge" — and every translation of it.
+
+### Verified, not assumed
+
+- The One Piece SVG imported as `luffy-hat` writes all 12 sizes for all three
+  states in ~180 ms, and is selectable for a series immediately afterwards.
+- Screenshots of all three tabs, in English and German, plus the preview strip
+  zoomed: colour → mid-grey → silhouette, each shown on a light and a dark
+  panel. Both tones stay legible on both backgrounds.
+- The live tray menu is **flat** — 7 entries, no submenus — for a ready series
+  and 5 for a waiting one.
+- Kagurabachi and Sakamoto Days now show distinct pink "K" and green "S"
+  badges where both previously showed the same book.
+- The stale-copy regression tests were confirmed to fail against the old code.

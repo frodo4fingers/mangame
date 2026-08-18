@@ -1,26 +1,30 @@
 """The tray: one icon per tracked series, and a deliberately tiny menu.
 
-Menu design follows the brief literally — the only top-level entries are the
-three settings plus Quit:
+The menu holds verbs only — the things you *do*:
 
-    Manga ▸  ·  Language ▸  ·  ☑ Start on login  ·  Quit
+    [Series — state]  ·  Open chapter  ·  Mark as read
+    Add manga…  ·  Check now  ·  Settings…  ·  Quit
 
-Anything series-specific (open the chapter, mark it read) only appears when it
-is actually actionable, so the normal resting state of the menu is those four
-lines. Adding, removing and forcing a check live inside the Manga submenu,
-which keeps the top level from growing.
+Anything series-specific only appears when it is actually actionable, so the
+resting state is those four lines. Everything with a *value* — the language,
+the switches, which series show an icon, which emblem each wears — lives in
+:mod:`mangame.ui.settings_dialog` instead.
+
+That split is deliberate. The menu used to nest three deep (Manga ▸ Stop
+tracking ▸ a series), which is slow to reach and, on a panel pinned to a screen
+edge, prone to running off the display entirely. A flat list of verbs cannot.
 """
 
 import logging
 from datetime import UTC, datetime
 
 from PySide6.QtCore import QObject, QTimer, QUrl
-from PySide6.QtGui import QAction, QActionGroup, QDesktopServices
+from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import QApplication, QDialog, QMenu, QSystemTrayIcon
 
 from mangame.domain.models import IconState, SeriesSnapshot
 from mangame.domain.state import aggregate
-from mangame.i18n.catalog import Translator, available
+from mangame.i18n.catalog import Translator
 from mangame.service import autostart
 from mangame.service.library import Library
 from mangame.service.poller import PollOutcome
@@ -32,6 +36,7 @@ from mangame.store.db import Database
 from mangame.ui.add_dialog import AddSeriesDialog, SeriesCandidate
 from mangame.ui.emblems import icon_for
 from mangame.ui.menu import TrayMenu
+from mangame.ui.settings_dialog import SettingsDialog
 from mangame.ui.worker import PollWorker, SearchWorker
 
 LOG = logging.getLogger(__name__)
@@ -73,6 +78,8 @@ class MangameTray(QObject):
         self._last_state: dict[str, IconState] = {}
         self._searches: set[SearchWorker] = set()
         self._dialog: AddSeriesDialog | None = None
+        self._settings_dialog: SettingsDialog | None = None
+        self._relanguage = False
 
         self._worker = PollWorker()
         self._worker.outcomes.connect(self._on_outcomes)
@@ -186,98 +193,94 @@ class MangameTray(QObject):
                 read_action.triggered.connect(lambda: self._mark_read(snapshot.key))
             menu.addSeparator()
 
-        menu.addMenu(self._manga_menu(menu))
-        menu.addMenu(self._language_menu(menu))
+        add = menu.addAction(self._t("menu.add"))
+        add.triggered.connect(self._add_series)
 
-        boot = menu.addAction(self._t("menu.autostart"))
-        boot.setCheckable(True)
-        boot.setChecked(autostart.is_enabled())
-        boot.setEnabled(autostart.is_supported())
-        boot.toggled.connect(self._set_autostart)
+        check = menu.addAction(self._t("menu.refresh"))
+        check.triggered.connect(self._worker.request_check_now)
+
+        settings = menu.addAction(self._t("menu.settings"))
+        settings.triggered.connect(self._open_settings)
 
         menu.addSeparator()
         quit_action = menu.addAction(self._t("menu.quit"))
         quit_action.triggered.connect(self._quit)
         return menu
 
-    def _manga_menu(self, parent: QMenu) -> QMenu:
-        menu = TrayMenu(self._t("menu.manga"), parent)
-
-        if not self._settings.series:
-            empty = menu.addAction(self._t("menu.no_series"))
-            empty.setEnabled(False)
-        for series_config in self._settings.series:
-            action = menu.addAction(series_config.title)
-            action.setCheckable(True)
-            action.setChecked(series_config.show_in_tray)
-            action.toggled.connect(
-                lambda checked, key=series_config.key: self._toggle_tray(key, checked)
-            )
-
-        menu.addSeparator()
-        add = menu.addAction(self._t("menu.add"))
-        add.triggered.connect(self._add_series)
-
-        if self._settings.series:
-            remove = TrayMenu(self._t("menu.remove"), menu)
-            for series_config in self._settings.series:
-                action = remove.addAction(series_config.title)
-                action.triggered.connect(
-                    lambda _checked=False, key=series_config.key: self._remove(key)
-                )
-            menu.addMenu(remove)
-
-        check = menu.addAction(self._t("menu.refresh"))
-        check.triggered.connect(self._worker.request_check_now)
-        return menu
-
-    def _language_menu(self, parent: QMenu) -> QMenu:
-        menu = TrayMenu(self._t("menu.language"), parent)
-        group = QActionGroup(menu)
-        group.setExclusive(True)
-
-        for code, label in available().items():
-            action = QAction(label, menu)
-            action.setCheckable(True)
-            action.setChecked(code == self._t.language)
-            action.triggered.connect(lambda _checked=False, chosen=code: self._set_language(chosen))
-            group.addAction(action)
-            menu.addAction(action)
-        return menu
-
     def _state_label(self, snapshot: SeriesSnapshot) -> str:
         return self._t(f"state.{snapshot.icon_state.value}")
 
-    # --------------------------------------------------------------- actions
+    # -------------------------------------------------------------- settings
 
-    def _set_language(self, code: str) -> None:
-        """Switch reading language.
+    def _open_settings(self) -> None:
+        """Show the settings window, reopening it if the language changed.
 
-        This changes *what gets polled*, not just the wording of the menu, so
-        everything owed is re-asked immediately instead of waiting out the
-        schedule the previous language left behind.
+        Modal for the same reason the add dialog is: ``exec()`` runs a nested
+        event loop, which is what delivers queued signals from the search
+        thread while a window is up.
         """
-        if code == self._settings.language:
+        if self._settings_dialog is not None:
+            self._settings_dialog.raise_()
+            self._settings_dialog.activateWindow()
             return
-        self._save(self._settings.model_copy(update={"language": code}))
-        self._worker.request_check_now()
+
+        while self._run_settings():
+            # The language is also the UI language, so a fresh dialog is the
+            # honest way to show the choice taking effect.
+            pass
+
+    def _run_settings(self) -> bool:
+        dialog = SettingsDialog(
+            self._t,
+            self._settings,
+            autostart_enabled=autostart.is_enabled(),
+            autostart_supported=autostart.is_supported(),
+        )
+        dialog.settings_changed.connect(self._on_settings_changed)
+        dialog.autostart_changed.connect(self._set_autostart)
+        dialog.add_requested.connect(lambda: self._add_series(dialog))
+        dialog.remove_requested.connect(self._remove)
+        dialog.artwork_changed.connect(self.refresh)
+
+        self._settings_dialog = dialog
+        self._relanguage = False
+        try:
+            dialog.exec()
+        finally:
+            self._settings_dialog = None
+        return self._relanguage
+
+    def _on_settings_changed(self, settings: Settings) -> None:
+        """Persist what the dialog changed, reacting to a language switch.
+
+        Changing the reading language changes *what gets polled*, not just the
+        wording, so everything owed is re-asked immediately instead of waiting
+        out the schedule the previous language left behind.
+        """
+        relanguage = settings.language != self._settings.language
+        self._save(settings)
+        if relanguage:
+            self._worker.request_check_now()
+            self._relanguage = True
+            if self._settings_dialog is not None:
+                self._settings_dialog.accept()
+
+    # --------------------------------------------------------------- actions
 
     def _set_autostart(self, enabled: bool) -> None:
         if autostart.set_enabled(enabled):
             self._save(self._settings.model_copy(update={"autostart": enabled}))
 
-    def _toggle_tray(self, key: str, checked: bool) -> None:
-        series = [
-            s.model_copy(update={"show_in_tray": checked}) if s.key == key else s
-            for s in self._settings.series
-        ]
-        self._save(self._settings.model_copy(update={"series": series}))
-
     def _remove(self, key: str) -> None:
         self._db.forget_series(key)
-        series = [s for s in self._settings.series if s.key != key]
         self._destroy_icon(key)
-        self._save(self._settings.model_copy(update={"series": series}))
+        self._save(self._settings.without_series(key))
+        self._resync_settings_dialog()
+
+    def _resync_settings_dialog(self) -> None:
+        """Push a changed series list back into an open settings window."""
+        if self._settings_dialog is not None:
+            self._settings_dialog.set_settings(self._settings)
 
     def _open(self, key: str) -> None:
         snapshot = self._library.snapshot_for(key, datetime.now(UTC))
@@ -301,13 +304,13 @@ class MangameTray(QObject):
 
     # ------------------------------------------------------------ add series
 
-    def _add_series(self) -> None:
+    def _add_series(self, parent: QDialog | None = None) -> None:
         """Open the one window that searches and adds.
 
         Modal on purpose: ``exec()`` runs a nested event loop, which is what
         delivers the search thread's queued signal while the dialog is up.
         """
-        dialog = AddSeriesDialog(self._t, [s.key for s in self._settings.series])
+        dialog = AddSeriesDialog(self._t, [s.key for s in self._settings.series], parent)
         dialog.search_requested.connect(lambda query: self._run_search(dialog, query))
         self._dialog = dialog
         try:
@@ -361,6 +364,7 @@ class MangameTray(QObject):
             sources=sources,
         )
         self._save(self._settings.model_copy(update={"series": [*self._settings.series, entry]}))
+        self._resync_settings_dialog()
         self._worker.request_check_now()
 
     # --------------------------------------------------------- notifications

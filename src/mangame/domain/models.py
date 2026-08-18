@@ -200,7 +200,7 @@ class TrackedSeries(BaseModel):
     """Stable local identifier, e.g. ``one-piece``."""
 
     title: str
-    emblem: str = "book"
+    emblem: str = "monogram"
     language: str = "en"
     enabled: bool = True
     show_in_tray: bool = True

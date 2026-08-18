@@ -45,7 +45,7 @@ class SeriesConfig(BaseModel):
 
     key: str
     title: str
-    emblem: str = "book"
+    emblem: str = "monogram"
     language: ReadingLanguage | None = None
     """Overrides the global reading language for this series only."""
 
@@ -80,6 +80,18 @@ class Settings(BaseModel):
 
     def language_for(self, series: SeriesConfig) -> str:
         return series.language or self.language
+
+    def with_series_change(self, key: str, **changes: object) -> "Settings":
+        """A copy in which one tracked series has been edited in place.
+
+        Order is preserved, because the series list is also the tray order.
+        """
+        series = [s.model_copy(update=changes) if s.key == key else s for s in self.series]
+        return self.model_copy(update={"series": series})
+
+    def without_series(self, key: str) -> "Settings":
+        """A copy with one series dropped."""
+        return self.model_copy(update={"series": [s for s in self.series if s.key != key]})
 
 
 def load(path: Path | None = None) -> Settings:

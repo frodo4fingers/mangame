@@ -4,11 +4,16 @@ Two mechanisms, in order:
 
 1. **Bundled or user-supplied artwork.** ``<emblems>/<name>/<state>/<size>.png``.
    The user directory is searched first, so anyone can drop in their own hat
-   without rebuilding the app.
+   without rebuilding the app — see :mod:`mangame.ui.artwork` for the importer
+   that writes that layout.
 2. **Procedural monogram.** Any series without artwork gets a generated badge:
    the initial on a colour derived from the title. This means every series has
    a distinct, recognisable icon from the moment it is added, and it sidesteps
    reproducing anyone's character art or logo.
+
+Missing artwork therefore falls back to the monogram and never to some other
+series' picture: a generated badge still says *which* series it is, whereas a
+shared stand-in would make every untouched series look identical.
 
 The three states are visually separated so they survive both light and dark
 panels: full colour, desaturated grey, and a near-black silhouette with a light
@@ -29,9 +34,10 @@ BUNDLED_DIR = Path(__file__).resolve().parent.parent / "assets" / "emblems"
 
 #: Sizes rasterised by ``tools/gen_icons.py``; a QIcon gets all of them so the
 #: platform can pick the right one for the panel and DPI.
-SIZES = (16, 18, 20, 22, 24, 32, 36, 44, 48, 64)
+SIZES = (16, 18, 20, 22, 24, 32, 36, 44, 48, 64, 128, 256)
 
-FALLBACK_EMBLEM = "book"
+#: Not a directory but a request: draw the badge instead of loading a picture.
+MONOGRAM_EMBLEM = "monogram"
 
 #: Per-state styling for the procedural monogram.
 _MONOGRAM_STYLE: dict[IconState, tuple[float, float, str, str]] = {
@@ -48,11 +54,18 @@ def emblem_roots() -> tuple[Path, ...]:
 
 
 def available_emblems() -> list[str]:
+    """Artwork names on disk, user and bundled, without the monogram."""
     names: set[str] = set()
     for root in emblem_roots():
         if root.is_dir():
             names.update(child.name for child in root.iterdir() if child.is_dir())
+    names.discard(MONOGRAM_EMBLEM)
     return sorted(names)
+
+
+def selectable_emblems() -> list[str]:
+    """What the settings dialog may offer, monogram first as the safe default."""
+    return [MONOGRAM_EMBLEM, *available_emblems()]
 
 
 def _find(emblem: str, state: IconState) -> Path | None:
@@ -109,19 +122,26 @@ def icon_for(emblem: str, state: IconState, title: str) -> QIcon:
     """The icon to show for one series in one state.
 
     Cached because the tray asks for these on every state change and the
-    answer only depends on the three arguments.
+    answer only depends on the three arguments. :func:`forget_artwork` drops
+    the cache after artwork is imported or removed.
     """
-    directory = _find(emblem, state) or _find(FALLBACK_EMBLEM, state)
-    if directory is not None:
-        icon = QIcon()
-        for size in SIZES:
-            candidate = directory / f"{size}.png"
-            if candidate.exists():
-                icon.addFile(str(candidate))
-        if not icon.isNull():
-            return icon
+    if emblem != MONOGRAM_EMBLEM:
+        directory = _find(emblem, state)
+        if directory is not None:
+            icon = QIcon()
+            for size in SIZES:
+                candidate = directory / f"{size}.png"
+                if candidate.exists():
+                    icon.addFile(str(candidate))
+            if not icon.isNull():
+                return icon
 
     icon = QIcon()
     for size in (16, 24, 32, 64):
         icon.addPixmap(monogram(title, state, size))
     return icon
+
+
+def forget_artwork() -> None:
+    """Drop cached icons so newly imported artwork is picked up at once."""
+    icon_for.cache_clear()

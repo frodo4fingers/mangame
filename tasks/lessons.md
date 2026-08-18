@@ -171,3 +171,48 @@
 - **Rule**: Derive the affordance from the rule that enforces it. Move the
   identity function next to the model that owns the key and call it from both
   sides, rather than reimplementing "close enough" in the UI.
+
+### A fallback that never fails hides the fallback behind it
+- **What**: `icon_for` resolved `_find(emblem) or _find("book")` before falling
+  through to the generated monogram. Since `book` always exists, the monogram
+  was dead code — and because `emblem_for()` returns `"monogram"` for every
+  series but One Piece, *every* tracked series wore the same book icon.
+- **Why**: Chained fallbacks are ordered by specificity, and a catch-all placed
+  above a better answer silently deletes it. Nothing errors; it just looks
+  boring, so nobody looks.
+- **Rule**: Put the *most specific* fallback last only if it can fail. If a
+  step always succeeds, everything after it is unreachable — check that by
+  asserting two different inputs produce two different outputs, not just that
+  the output is non-null.
+
+### A dialog that reports changes must also adopt them
+- **What**: The settings dialog emitted `self._settings.model_copy(update=...)`
+  for every edit, but `self._settings` only changed when the tray echoed a save
+  back. Turning off notifications and then picking an emblem emitted a copy of
+  the *original* settings with a new emblem — quietly turning notifications on
+  again.
+- **Why**: An edit is a function of the current state, not the opening state.
+  Holding the opening state makes every change independent of every other one,
+  which is exactly wrong.
+- **Rule**: Route every emit through one method that assigns the new value
+  before emitting it. Then test *two* edits in a row — a single-edit test
+  passes happily against the broken version.
+
+### Widgets need a display, images do not
+- **What**: `QPixmap` requires a `QGuiApplication`; `QImage` requires nothing.
+  Writing the artwork transforms against `QImage` made them assertable pixel by
+  pixel in ordinary unit tests, with no display and no fixture.
+- **Why**: The rendering primitives are split precisely along "does this touch
+  the window system".
+- **Rule**: Keep image work on `QImage` and convert to `QPixmap` at the last
+  moment, in the widget. Where widgets really are the thing under test, drive
+  them on `QT_QPA_PLATFORM=offscreen` rather than skipping the test.
+
+### PySide6 type stubs and PySide6 runtime disagree
+- **What**: `QImage.save(path, b"PNG")` satisfies mypy — the stub says the
+  format is `bytes` — and raises `ValueError` at runtime, which wants `str`.
+- **Why**: The stubs are generated from the C++ signature; the binding converts
+  differently.
+- **Rule**: Where an argument is optional and inferable, omit it. Qt derives the
+  format from the file suffix, which keeps both the checker and the runtime
+  happy.
