@@ -78,3 +78,14 @@
 - **Why**: Independent research threads benefit from separate context; a single
   causal trace is corrupted by splitting it.
 - **Rule**: Delegate breadth. Never delegate one continuous trace.
+
+### Qt popups ignore the panel, and only the tray notices
+- **What**: Tray submenus hung 44px behind the KDE panel. Qt fits popups to the
+  full screen rectangle, not the work area, because the platform theme asks it
+  to. Parenting the menu and `setScreen()` both changed nothing, and Qt's XCB
+  SNI never exports the menu over DBusMenu, so Plasma could not place it either.
+- **Why**: A tray menu is the one menu that always opens against a panel, so it
+  is the only place where "full screen" and "work area" visibly differ.
+- **Rule**: Measure the geometry before theorising about the cause. Clamp popups
+  to `availableGeometry()` yourself, and keep the arithmetic in a pure function
+  so it can be tested without a display.
