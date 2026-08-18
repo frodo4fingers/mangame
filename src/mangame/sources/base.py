@@ -49,6 +49,23 @@ class Capabilities(BaseModel):
     batch_feed: bool = False
     """Can answer for many series in one request (see :meth:`Source.fetch_batch`)."""
 
+    languages: frozenset[str] = frozenset()
+    """Reading languages whose chapters this source can actually attribute.
+
+    Empty means the source cannot tell one language from another. Such a
+    source must never report chapters, because a chapter of unknown language
+    would be indistinguishable from a chapter the user can read — which is
+    exactly what turns the icon to "ready" for a release that is not there.
+    """
+
+    def serves(self, language: str) -> bool:
+        """Is this source worth asking for ``language``?
+
+        Sources without chapter timestamps answer a language-independent
+        question (is the series on hiatus?), so they are always worth asking.
+        """
+        return not self.chapter_timestamps or language in self.languages
+
 
 class FetchRequest(BaseModel):
     """One series, on one source."""
@@ -58,6 +75,7 @@ class FetchRequest(BaseModel):
     series_key: str
     ref: str
     language: str = "en"
+    """Canonical reading language wanted; see :mod:`mangame.i18n.languages`."""
     validators: CacheValidators = Field(default_factory=CacheValidators)
     watermark: str | None = None
     """Change token from the previous fetch, if the source supports one."""
@@ -96,8 +114,6 @@ class BatchSource(Source, Protocol):
 @runtime_checkable
 class Registry(Protocol):
     """What the poller needs from a source registry, and nothing more."""
-
-    def __contains__(self, source_id: str) -> bool: ...
 
     def get(self, source_id: str) -> Source | None: ...
 

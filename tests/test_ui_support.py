@@ -6,7 +6,7 @@ import pytest
 from PySide6.QtCore import QPoint, QRect
 
 from mangame.domain.models import IconState
-from mangame.i18n.catalog import _CATALOGS, _EN, LANGUAGES, Translator, available, normalize
+from mangame.i18n.catalog import _CATALOGS, _EN, LANGUAGES, Translator, available
 from mangame.ui import emblems
 from mangame.ui.menu import fitted_position
 
@@ -25,11 +25,17 @@ class TestTranslator:
         assert Translator("DE")("menu.language") == "Sprache"
 
     def test_conventional_region_casing_is_understood(self) -> None:
-        assert Translator("pt-BR").language == "pt-br"
+        assert Translator("es-MX").language == "es"
 
     def test_an_os_locale_degrades_to_its_base_language(self) -> None:
         assert Translator("de_DE.UTF-8").language == "de"
-        assert Translator("fr-CA").language == "fr"
+        assert Translator("en-GB").language == "en"
+
+    def test_a_language_we_cannot_poll_for_is_not_offered(self) -> None:
+        # Reading language and menu language are the same setting, so a
+        # catalog we cannot fetch chapters for would be a promise we break.
+        assert Translator("ja").language == "en"
+        assert "ja" not in available()
 
     def test_an_unknown_key_returns_something_showable(self) -> None:
         # Better a visible key than a blank menu entry.
@@ -49,11 +55,14 @@ class TestTranslator:
         assert set(_CATALOGS) <= set(LANGUAGES)
 
     def test_available_lists_languages_in_their_own_language(self) -> None:
-        assert available()["ja"] == "日本語"
+        assert available()["es"] == "Español"
+        assert available()["de"] == "Deutsch"
 
-    def test_an_unrecognisable_tag_still_yields_english(self) -> None:
-        assert normalize("") == "en"
-        assert normalize("zz-ZZ") == "en"
+    @pytest.mark.parametrize("tag", ["", "zz-ZZ", "ja"])
+    def test_an_unrecognisable_tag_still_yields_a_usable_menu(self, tag: str) -> None:
+        # Folding happens in i18n.languages; what matters here is that the
+        # menu never comes back blank.
+        assert Translator(tag)("menu.quit") == _EN["menu.quit"]
 
 
 class TestEmblems:

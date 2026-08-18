@@ -15,6 +15,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from mangame.domain.models import Chapter, PublicationStatus, SourceSignal
+from mangame.i18n import languages
 from mangame.sources.base import Capabilities, FetchRequest, SourceError, SourceMatch
 from mangame.sources.http import HttpClient
 
@@ -71,6 +72,7 @@ class MangaDexSource:
         hiatus_flag=True,
         search=True,
         batch_feed=True,
+        languages=frozenset(languages.codes()),
     )
     min_interval = timedelta(minutes=5)
 
@@ -105,7 +107,10 @@ class MangaDexSource:
         feed = await client.get_json(
             f"{API}/manga/{request.ref}/feed",
             params={
-                "translatedLanguage[]": request.language,
+                # Every code for the wanted language, because MangaDex splits
+                # some languages by region (Spanish is "es" and "es-la") and a
+                # reader who asked for Spanish wants both.
+                "translatedLanguage[]": list(languages.source_codes(request.language)),
                 "order[publishAt]": "desc",
                 "limit": self._feed_limit,
             },
@@ -150,7 +155,11 @@ class MangaDexSource:
                     number=chapter_attrs.get("chapter"),
                     volume=chapter_attrs.get("volume"),
                     title=chapter_attrs.get("title"),
-                    language=str(chapter_attrs.get("translatedLanguage") or request.language),
+                    # Folded onto the canonical code so that an "es-la" chapter
+                    # is stored as Spanish and found by a Spanish reader.
+                    language=languages.canonical(
+                        str(chapter_attrs.get("translatedLanguage") or request.language)
+                    ),
                     published_at=published,
                     url=chapter_attrs.get("externalUrl")
                     or f"https://mangadex.org/chapter/{entry['id']}",
@@ -174,6 +183,11 @@ class MangaDexSource:
 
         The caller compares ``latest_chapter_id`` with what it stored last time
         and only drills into the series that actually moved.
+
+        The watermark is language-blind: it moves when *any* translation is
+        uploaded. That errs on the side of looking, which is the safe
+        direction — a missed upload would mean a missed chapter, whereas an
+        extra look merely costs one request.
         """
         results: dict[str, tuple[PublicationStatus, str | None]] = {}
         for start in range(0, len(refs), MAX_IDS_PER_SWEEP):

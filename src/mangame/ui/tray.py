@@ -25,6 +25,7 @@ from mangame.i18n.catalog import Translator, available
 from mangame.service import autostart
 from mangame.service.library import Library
 from mangame.service.poller import PollOutcome
+from mangame.sources import registry
 from mangame.sources.base import SourceMatch
 from mangame.store import config
 from mangame.store.config import SeriesConfig, Settings
@@ -252,8 +253,16 @@ class MangameTray(QObject):
     # --------------------------------------------------------------- actions
 
     def _set_language(self, code: str) -> None:
-        settings = self._settings.model_copy(update={"language": code})
-        self._save(settings)
+        """Switch reading language.
+
+        This changes *what gets polled*, not just the wording of the menu, so
+        everything owed is re-asked immediately instead of waiting out the
+        schedule the previous language left behind.
+        """
+        if code == self._settings.language:
+            return
+        self._save(self._settings.model_copy(update={"language": code}))
+        self._worker.request_check_now()
 
     def _set_autostart(self, enabled: bool) -> None:
         if autostart.set_enabled(enabled):
@@ -338,18 +347,22 @@ class MangameTray(QObject):
 
         Cross-linking matters: MangaDex supplies chapter times while AniList
         supplies the hiatus flag, and a series needs both to use all three
-        icon states.
+        icon states. Sources that cannot speak the reading language are left
+        out, because they could only ever answer about somebody else's release.
         """
         key = slugify(chosen.title)
         if any(s.key == key for s in self._settings.series):
             return
 
+        language = self._settings.language
         sources = {chosen.source_id: chosen.ref}
         normalised = chosen.title.strip().lower()
         for candidate in everything:
             if candidate.source_id in sources:
                 continue
             if candidate.source_id not in PREFERRED_SOURCES:
+                continue
+            if not registry.serves(candidate.source_id, language):
                 continue
             if candidate.title.strip().lower() == normalised:
                 sources[candidate.source_id] = candidate.ref

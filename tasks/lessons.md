@@ -89,3 +89,43 @@
 - **Rule**: Measure the geometry before theorising about the cause. Clamp popups
   to `availableGeometry()` yourself, and keep the arithmetic in a pure function
   so it can be tested without a display.
+
+### A setting means something, and the meaning has to reach the network layer
+- **What**: "Language" was built as a UI-label switch. The user meant the
+  language they *read* the manga in. The plumbing half-existed — settings and
+  queries were language-aware — but every source was asked in every language
+  and MangaUpdates stamped whatever language was *requested* onto releases it
+  cannot attribute at all, so a German reader would have been shown an English
+  scanlation labelled German.
+- **Why**: A setting that only reaches the presentation layer looks implemented
+  and passes its tests. The damage shows up at the boundary where a source is
+  asked a question it cannot answer, and answers anyway.
+- **Rule**: Trace a user-facing setting all the way to the request it changes.
+  Make each adapter declare what it can actually serve (`Capabilities.languages`)
+  and let the scheduler skip the rest — never let a source guess a field the API
+  does not return. Verify the limitation against the live API before writing it
+  down: MangaUpdates' `lang` filter returns identical hit counts either way.
+
+### Cache validators answer the previous question
+- **What**: Switching language left ETag, `Last-Modified` and MangaDex's
+  `latestUploadedChapter` watermark in place, so the next poll short-circuited
+  to "nothing changed" and the new language's chapters were never fetched.
+- **Why**: A validator is only valid for the request that produced it. The
+  reading language is part of that request even though it is not part of the URL
+  the validator was stored against.
+- **Rule**: When a setting changes the *question* asked of a source, invalidate
+  the cached answer with it. `clear_due()` clears validators and watermarks, not
+  just the due time.
+
+### One code is not one language
+- **What**: MangaDex files Spanish under both `es` and `es-la`, and lists both
+  in `availableTranslatedLanguages` for the same series. Asking for one code
+  would have hidden the other's chapters — Latin-American Spanish is where most
+  One Piece translations actually land.
+- **Why**: Language tags are a family, not an identifier. OS locales
+  (`es_MX.UTF-8`) and region codes (`es-419`) widen the family further.
+- **Rule**: Model a language as a canonical code plus the source codes it
+  covers. Ask for every code in one request, fold to the canonical code at the
+  boundary (adapter on the way in, validator on config load), and keep the
+  round trip under test so no code is fetched under one name and stored under
+  another.

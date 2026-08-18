@@ -41,6 +41,48 @@ MangaUpdates' `/v1/releases/days` firehose is deliberately *not* used: it return
 roughly nine thousand releases per day, which costs far more than polling the
 handful of series a user actually tracks.
 
+### Reading language decides who is asked
+
+The `Language` setting is the language you *read* in, not a label switch. It
+picks the sources that are polled and the chapters that count as ready, so
+`i18n/languages.py` — a three-entry registry of English, Spanish and German —
+sits underneath both the source layer and the settings.
+
+Each adapter declares `Capabilities.languages`, and `serves(language)` is true
+when the language is in that set **or** the source carries no chapter
+timestamps at all. Status-only sources are language-independent by nature: a
+hiatus is a hiatus whichever translation you are waiting for. `_due_work()`
+skips any source that does not serve the configured language, so a German
+reader never spends a request on an English-only index.
+
+Two things this exposed, both now fixed:
+
+- **MangaUpdates cannot attribute language.** It used to stamp releases with
+  whatever language was *requested*. Its release records are only
+  `{id, title, volume, chapter, groups, release_date, time_added}`, and passing
+  `lang` to `/v1/releases/search` is silently ignored — identical hit counts
+  either way. So it declares English and stamps English. It is kept rather than
+  demoted to status-only because MangaDex's English feed for licensed series
+  only covers the free window, and MangaUpdates' long release history is what
+  makes English cadence learning work.
+- **The sweep watermark is language-blind.** MangaDex's `latestUploadedChapter`
+  moves for *any* translation, so after switching language the watermark is
+  unchanged and the batch sweep would short-circuit to "nothing changed" — the
+  new language's chapters would never be fetched. `clear_due()`, which is both
+  the "check now" path and the language-switch path, now clears ETag,
+  `Last-Modified` and watermark along with the due time.
+
+Language tags are folded at the boundary, not at the point of use: adapters
+canonicalise on the way in and settings validate on load, so `es-la` from
+MangaDex and `es_MX.UTF-8` from an OS locale both become `es`. That is why
+Spanish asks MangaDex for `es` **and** `es-la` in one request but stores one
+code, and why `chapters_for(language=...)` can be an exact match rather than a
+prefix dance.
+
+A source the user pointed at themselves is treated differently from an index
+mangame queries: `feed` accepts every language, because choosing a German feed
+URL *is* the assertion that it carries German.
+
 ### Source quirks that are handled
 
 - **MangaDex's 2037 sentinel.** MANGA Plus-linked chapters carry
@@ -142,11 +184,11 @@ service/     library, poller, autostart          ← orchestration
 sources/     adapters + HTTP plumbing            ← the only network code
 store/       SQLite + JSON settings              ← the only persistence
 domain/      models, cadence, breaks, state, schedule
-i18n/        menu catalogues
+i18n/        reading languages + menu catalogues
 ```
 
 `domain/` is pure: no I/O, no network, and no clock — `now` is always a
-parameter. That is what makes 199 tests run in under three seconds with no
+parameter. That is what makes 244 tests run in under three seconds with no
 network access, and it is why the rules above can be asserted directly rather
 than inferred from behaviour.
 

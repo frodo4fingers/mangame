@@ -116,8 +116,15 @@ class Poller:
         grouped: dict[str, list[FetchRequest]] = defaultdict(list)
 
         for config in self._library.configs():
+            language = self._library.settings.language_for(config)
             for source_id, ref in config.sources.items():
-                if source_id not in self._registry:
+                source = self._registry.get(source_id)
+                if source is None:
+                    continue
+                # Asking a source for a language it cannot attribute is worse
+                # than useless: it returns chapters that are not the ones the
+                # user is waiting for.
+                if not source.capabilities.serves(language):
                     continue
                 poll = self._db.poll_state(config.key, source_id)
                 if poll.next_due_at is not None and poll.next_due_at > now:
@@ -126,7 +133,7 @@ class Poller:
                     FetchRequest(
                         series_key=config.key,
                         ref=ref,
-                        language=self._library.settings.language_for(config),
+                        language=language,
                         validators=CacheValidators(
                             etag=poll.etag, last_modified=poll.last_modified
                         ),

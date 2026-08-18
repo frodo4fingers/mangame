@@ -2,7 +2,16 @@
 
 MangaUpdates records dated *release* rows going back years, which is the
 richest history available for learning a rhythm — far better than aggregators
-that only keep the last handful of chapters.
+that only keep the last handful of chapters. That history is what keeps cadence
+learning working for licensed series, whose MangaDex feed only exposes the free
+window of two or three chapters.
+
+**It cannot attribute a language.** Neither ``/v1/series/{id}`` nor a release
+record carries one, and passing ``lang``/``language`` to ``/v1/releases/search``
+changes nothing (verified: identical hit counts). Its index is overwhelmingly
+English scanlation releases, so the adapter declares English and only English.
+A German reader is therefore never told that a German chapter landed on the
+strength of an English scanlation group's release.
 
 It deliberately does **not** advertise a batch feed. The obvious candidate,
 ``GET /v1/releases/days``, reports roughly nine thousand releases site-wide per
@@ -26,6 +35,10 @@ RATE_PER_SECOND = 1.0
 
 HISTORY_PAGE_SIZE = 50
 
+#: The only language this source may speak for. Release records carry no
+#: language at all, so anything else would be a guess dressed up as data.
+SERVED_LANGUAGE = "en"
+
 
 def _release_time(record: dict[str, Any]) -> datetime | None:
     """Prefer the timestamped ``time_added``, fall back to the plain date."""
@@ -44,7 +57,7 @@ def _release_time(record: dict[str, Any]) -> datetime | None:
         return None
 
 
-def _chapter_from(record: dict[str, Any], language: str) -> Chapter | None:
+def _chapter_from(record: dict[str, Any]) -> Chapter | None:
     published = _release_time(record)
     if published is None:
         return None
@@ -55,7 +68,7 @@ def _chapter_from(record: dict[str, Any], language: str) -> Chapter | None:
         number=str(record["chapter"]) if record.get("chapter") else None,
         volume=str(record["volume"]) if record.get("volume") else None,
         title=groups or None,
-        language=language,
+        language=SERVED_LANGUAGE,
         published_at=published,
     )
 
@@ -71,6 +84,7 @@ class MangaUpdatesSource:
         hiatus_flag=True,
         search=True,
         batch_feed=False,
+        languages=frozenset({SERVED_LANGUAGE}),
     )
     min_interval = timedelta(minutes=15)
 
@@ -122,9 +136,7 @@ class MangaUpdatesSource:
                 unchanged=True,
             )
 
-        chapters = await self._history(
-            client, ref=request.ref, title=title, language=request.language
-        )
+        chapters = await self._history(client, ref=request.ref, title=title)
         return SourceSignal(
             source_id=self.source_id,
             fetched_at=now,
@@ -133,9 +145,7 @@ class MangaUpdatesSource:
             watermark=watermark,
         )
 
-    async def _history(
-        self, client: HttpClient, *, ref: str, title: str, language: str
-    ) -> list[Chapter]:
+    async def _history(self, client: HttpClient, *, ref: str, title: str) -> list[Chapter]:
         """Dated releases for one series, used to learn its rhythm."""
         if not title:
             return []
@@ -154,7 +164,7 @@ class MangaUpdatesSource:
             series = (entry.get("metadata") or {}).get("series") or {}
             if str(series.get("series_id")) != str(ref):
                 continue
-            chapter = _chapter_from(entry.get("record", {}), language)
+            chapter = _chapter_from(entry.get("record", {}))
             if chapter is not None:
                 chapters.append(chapter)
         return chapters

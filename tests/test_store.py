@@ -147,6 +147,28 @@ class TestPollState:
         db.clear_due()
         assert ("a", "mangadex") in db.due_pairs(NOW)
 
+    def test_check_now_forgets_what_the_last_answer_was(self, db: Database) -> None:
+        # Validators and watermarks answer the *previous* question, and the
+        # reading language is part of that question. Keeping them would let a
+        # source reply "nothing changed" right after a switch to German.
+        db.save_poll_state(
+            PollState(
+                series_key="a",
+                source_id="mangadex",
+                next_due_at=NOW + timedelta(days=3),
+                etag='W/"abc"',
+                last_modified="Wed, 12 Aug 2026 10:00:00 GMT",
+                watermark="2026-08-12T10:00:00+00:00",
+            )
+        )
+
+        db.clear_due()
+
+        state = db.poll_state("a", "mangadex")
+        assert state.etag is None
+        assert state.last_modified is None
+        assert state.watermark is None
+
 
 class TestReadState:
     def test_marking_read_records_the_chapter(self, db: Database) -> None:
@@ -211,8 +233,8 @@ class TestSettings:
             language="de",
             series=[
                 config_store.SeriesConfig(key="a", title="A"),
-                config_store.SeriesConfig(key="b", title="B", language="ja"),
+                config_store.SeriesConfig(key="b", title="B", language="es"),
             ],
         )
         assert settings.language_for(settings.series[0]) == "de"
-        assert settings.language_for(settings.series[1]) == "ja"
+        assert settings.language_for(settings.series[1]) == "es"

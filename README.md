@@ -28,15 +28,38 @@ Deliberately four items:
 
 - **Manga ▸** — add a series, stop tracking one, mark it read, open the latest
   chapter, or force an immediate check.
-- **Language ▸** — English, Deutsch, Français, Español, Português (BR),
-  Italiano, 日本語.
+- **Language ▸** — English, Español, Deutsch. This is the language you *read*
+  in, not just the label language: it decides which sources get polled and
+  which chapters count as ready. Switching it re-checks everything at once.
 - **Start on login** — a checkbox. Writes an XDG `.desktop` entry on Linux, an
   `HKCU\...\Run` value on Windows, and a LaunchAgent plist on macOS.
 - **Quit**.
 
 Adding a series searches MangaDex, MangaUpdates and AniList at once and links
-whichever of them recognise it, so one series can be watched through several
-sources without any extra configuration.
+whichever of them recognise it *and can serve your language*, so one series can
+be watched through several sources without any extra configuration.
+
+## Languages
+
+The three supported languages are the ones the sources can actually be held to:
+
+| Language | Codes asked for | Chapter sources |
+| --- | --- | --- |
+| English | `en` | MangaDex, MangaUpdates, feeds |
+| Español | `es`, `es-la` | MangaDex, feeds |
+| Deutsch | `de` | MangaDex, feeds |
+
+Spanish asks for two codes because MangaDex files Latin-American translations
+under `es-la`; both are stored as `es`, so you see whichever lands first.
+
+MangaUpdates is English-only on purpose. Its release records carry no language
+field and its `lang` filter is silently ignored, so anything else would be an
+English scanlation presented as a German one. AniList is asked in every
+language: it reports hiatus and status, never chapters, and those are true
+whichever translation you wait for.
+
+A per-series `language` in `config.json` overrides the global setting, for the
+one title you follow in a different language from the rest.
 
 ## Where things are stored
 

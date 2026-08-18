@@ -9,6 +9,11 @@ publication timestamps.
 So the ``ref`` for this source *is* the feed URL. Adding a new site is a config
 line, not a release. Feeds also honour ``ETag``/``If-Modified-Since`` properly,
 which makes the tight hot-window polling nearly free.
+
+Because the URL is one the user chose deliberately, whatever it publishes is
+taken to be in the language they are reading — that is how a reader adds a
+German or Spanish scanlation site that no global index can attribute. This is
+the opposite of an index we merely query, which must never guess a language.
 """
 
 import re
@@ -18,6 +23,7 @@ from typing import Any
 from xml.etree import ElementTree
 
 from mangame.domain.models import Chapter, SourceSignal
+from mangame.i18n import languages
 from mangame.sources.base import Capabilities, FetchRequest, SourceError, SourceMatch
 from mangame.sources.http import HttpClient
 
@@ -127,6 +133,7 @@ class FeedSource:
         hiatus_flag=False,
         search=False,
         batch_feed=False,
+        languages=frozenset(languages.codes()),
     )
     min_interval = timedelta(minutes=10)
 

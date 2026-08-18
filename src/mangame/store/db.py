@@ -320,8 +320,18 @@ class Database:
         return {(row["series_key"], row["source_id"]) for row in rows}
 
     def clear_due(self) -> None:
-        """Make everything owed immediately, for an explicit "check now"."""
-        self._connection.execute("UPDATE poll_state SET next_due_at = NULL, consecutive_errors = 0")
+        """Make everything owed immediately, for an explicit "check now".
+
+        Cache validators and watermarks go too. They describe the answer to the
+        *previous* question, and the reading language is part of that question:
+        MangaDex's ``latestUploadedChapter`` moves for any translation, so a
+        reader who just switched to German would otherwise be told "nothing
+        changed" and never see a German chapter arrive.
+        """
+        self._connection.execute(
+            "UPDATE poll_state SET next_due_at = NULL, consecutive_errors = 0,"
+            " etag = NULL, last_modified = NULL, watermark = NULL"
+        )
 
     # -------------------------------------------------------------- read state
 

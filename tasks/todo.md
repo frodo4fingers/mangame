@@ -106,3 +106,51 @@ generic RSS/Atom adapter means most new sites cost a config line, not a release.
   release concern, not a correctness one.
 - **Magazine skip calendars.** The break-confidence ranking already has a slot
   for them (`MEDIUM`); no calendar data source is wired up yet.
+
+## Follow-up: the reading language (2026-08)
+
+The `Language` menu was built as a UI-label switch. It was meant to be the
+language the *manga* is read in — which sources get polled, and which chapters
+count as ready. Scope narrowed to English, Spanish and German.
+
+- [x] `i18n/languages.py` — a registry of the three languages, each a canonical
+      code plus the source codes it covers (`es` → `es`, `es-la`).
+- [x] Catalogues trimmed to the languages we can actually poll for; the menu no
+      longer offers French, Portuguese, Italian or Japanese.
+- [x] `Capabilities.languages` + `serves()`, declared per adapter.
+- [x] MangaDex asks for every code of the chosen language in one request and
+      folds `es-la` → `es` on the way in.
+- [x] MangaUpdates declared English-only; it no longer stamps releases with the
+      requested language.
+- [x] The poller skips sources that cannot serve the configured language.
+- [x] `clear_due()` clears validators and watermarks, so a language switch is
+      not answered "nothing changed".
+- [x] Settings normalise language tags on load (`ReadingLanguage`).
+- [x] The tray links only sources that serve the language, and switching
+      language forces an immediate re-check.
+- [x] 46 new tests; docs updated.
+
+### Bugs this exposed
+
+1. **MangaUpdates mislabelled every release.** `_chapter_from()` stamped the
+   *requested* language onto records that carry no language at all. Verified
+   against the live API: release records are only
+   `{id, title, volume, chapter, groups, release_date, time_added}`, and
+   `/v1/releases/search` ignores `lang` — 9832 hits with or without it. A German
+   reader would have been told a German chapter landed on the strength of an
+   English scanlation.
+2. **The sweep watermark is language-blind.** `latestUploadedChapter` moves for
+   any translation, so after a language switch the watermark is unchanged, the
+   batch sweep reports `unchanged`, and the new language's chapters are never
+   fetched.
+3. **Spanish needs two codes.** MangaDex lists both `es` and `es-la` for the
+   same series; One Piece has 14 chapters under `es` and its Latin-American
+   translations under `es-la`. Asking for one code hides the other.
+
+### Verified, not assumed
+
+- Live MangaDex per-language totals for One Piece (en 6, de 6, es 14, pt-br 68),
+  and that a multi-value `translatedLanguage[]` request returns HTTP 200.
+- `availableTranslatedLanguages` lists 24 codes including both Spanish variants.
+- MangaUpdates returns identical `total_hits` with and without a `lang`
+  parameter, which is what the English-only declaration rests on.

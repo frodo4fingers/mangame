@@ -10,10 +10,21 @@ import json
 import os
 import tempfile
 from pathlib import Path
+from typing import Annotated
 
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import AfterValidator, BaseModel, Field, ValidationError
 
+from mangame.i18n import languages
 from mangame.store import paths
+
+ReadingLanguage = Annotated[str, AfterValidator(languages.normalize)]
+"""A language code folded onto one mangame can actually read in.
+
+Applied at the settings boundary so every layer below — sources, store,
+snapshots — only ever sees a canonical code. A hand-edited ``"pt-BR"`` or a
+language dropped from a later release therefore degrades to something the
+sources can serve instead of silently matching no chapters at all.
+"""
 
 
 class SeriesConfig(BaseModel):
@@ -22,8 +33,8 @@ class SeriesConfig(BaseModel):
     key: str
     title: str
     emblem: str = "book"
-    language: str | None = None
-    """Preferred chapter language; ``None`` inherits :attr:`Settings.language`."""
+    language: ReadingLanguage | None = None
+    """Overrides the global reading language for this series only."""
 
     show_in_tray: bool = True
     enabled: bool = True
@@ -34,8 +45,13 @@ class SeriesConfig(BaseModel):
 class Settings(BaseModel):
     """Everything the tiny menu can change, plus a few file-only escape hatches."""
 
-    language: str = "en"
-    """UI language, and the default chapter language."""
+    language: ReadingLanguage = languages.DEFAULT
+    """The language you read manga in.
+
+    This decides which sources are polled and which chapters count as "ready",
+    so it is a content setting rather than a cosmetic one. The menu is shown in
+    the same language, which is what keeps it to a single entry.
+    """
 
     autostart: bool = False
     notifications: bool = True

@@ -11,7 +11,7 @@ from types import TracebackType
 from typing import Self
 
 from mangame.sources import anilist, mangadex, mangaupdates
-from mangame.sources.base import Source
+from mangame.sources.base import Capabilities, Source
 from mangame.sources.feed import FeedSource
 from mangame.sources.http import HttpClient
 
@@ -22,6 +22,20 @@ _BUILTINS: tuple[tuple[Source, float, int], ...] = (
     (anilist.AniListSource(), anilist.RATE_PER_SECOND, 2),
     (FeedSource(), 1.0, 4),
 )
+
+_CAPABILITIES: dict[str, Capabilities] = {
+    source.source_id: source.capabilities for source, _rate, _burst in _BUILTINS
+}
+
+
+def serves(source_id: str, language: str) -> bool:
+    """Can the built-in adapter answer for ``language``?
+
+    Available without building a registry, so the UI can decide which sources
+    are worth linking to a new series without opening any HTTP clients.
+    """
+    capabilities = _CAPABILITIES.get(source_id)
+    return capabilities is not None and capabilities.serves(language)
 
 
 class SourceRegistry:

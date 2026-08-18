@@ -96,9 +96,7 @@ class Library:
 
         new_chapters = 0
         for signal in signal_list:
-            relevant = [
-                chapter for chapter in signal.chapters if chapter.language in (language, "")
-            ]
+            relevant = [chapter for chapter in signal.chapters if chapter.language == language]
             new_chapters += self._db.record_chapters(config.key, relevant)
 
         learned = self._merge_learned(config, signal_list, language, now)

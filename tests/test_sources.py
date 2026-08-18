@@ -10,7 +10,7 @@ import pytest
 import respx
 
 from mangame.domain.models import PublicationStatus
-from mangame.sources import anilist, mangadex, mangaupdates
+from mangame.sources import anilist, mangadex, mangaupdates, registry
 from mangame.sources.base import FetchRequest, SourceError
 from mangame.sources.http import CacheValidators, HttpClient
 
@@ -291,3 +291,93 @@ class TestMangaUpdates:
         # /releases/days returns roughly nine thousand releases a day, so a
         # firehose costs far more than polling the handful of tracked series.
         assert mangaupdates.MangaUpdatesSource().capabilities.batch_feed is False
+
+
+class TestLanguageRouting:
+    """Which language a source is asked for, and what it may claim in return."""
+
+    @respx.mock
+    async def test_spanish_asks_mangadex_for_both_regional_codes(self, client: HttpClient) -> None:
+        respx.get(f"{mangadex.API}/manga/{MANGA_ID}").mock(
+            return_value=httpx.Response(200, json=manga_detail())
+        )
+        route = respx.get(f"{mangadex.API}/manga/{MANGA_ID}/feed").mock(
+            return_value=httpx.Response(200, json={"result": "ok", "data": []})
+        )
+        source = mangadex.MangaDexSource()
+
+        await source.fetch(
+            client, FetchRequest(series_key="one-piece", ref=MANGA_ID, language="es")
+        )
+
+        asked = route.calls.last.request.url.params.get_list("translatedLanguage[]")
+        assert asked == ["es", "es-la"]
+
+    @respx.mock
+    async def test_a_latin_american_chapter_counts_as_spanish(self, client: HttpClient) -> None:
+        # Stored under the canonical code, otherwise a reader who chose
+        # "es" would never see a chapter MangaDex filed under "es-la".
+        entry = feed_entry("1190", "2026-08-09T15:07:05+00:00")
+        entry["attributes"]["translatedLanguage"] = "es-la"
+        respx.get(f"{mangadex.API}/manga/{MANGA_ID}").mock(
+            return_value=httpx.Response(200, json=manga_detail())
+        )
+        respx.get(f"{mangadex.API}/manga/{MANGA_ID}/feed").mock(
+            return_value=httpx.Response(200, json={"result": "ok", "data": [entry]})
+        )
+        source = mangadex.MangaDexSource()
+
+        signal = await source.fetch(
+            client, FetchRequest(series_key="one-piece", ref=MANGA_ID, language="es")
+        )
+
+        assert [chapter.language for chapter in signal.chapters] == ["es"]
+
+    def test_mangadex_serves_every_language_mangame_offers(self) -> None:
+        capabilities = mangadex.MangaDexSource.capabilities
+        assert all(capabilities.serves(code) for code in ("en", "es", "de"))
+
+    def test_mangaupdates_only_speaks_for_english(self) -> None:
+        # Its release records carry no language and its lang filter is ignored,
+        # so anything else would be a guess presented as fact.
+        capabilities = mangaupdates.MangaUpdatesSource.capabilities
+        assert capabilities.serves("en")
+        assert not capabilities.serves("de")
+        assert not capabilities.serves("es")
+
+    def test_a_mangaupdates_release_is_labelled_english_not_what_was_asked_for(self) -> None:
+        chapter = mangaupdates._chapter_from(
+            {
+                "id": 36642,
+                "chapter": "1190",
+                "volume": "108",
+                "groups": [{"name": "Some Group"}],
+                "release_date": "2026-08-09",
+            }
+        )
+        assert chapter is not None
+        assert chapter.language == "en"
+
+    def test_a_status_only_source_is_worth_asking_in_any_language(self) -> None:
+        # AniList carries no chapters, so its hiatus flag is equally true
+        # whichever language the reader picked.
+        capabilities = anilist.AniListSource.capabilities
+        assert not capabilities.chapter_timestamps
+        assert all(capabilities.serves(code) for code in ("en", "es", "de"))
+
+    @pytest.mark.parametrize(
+        ("source_id", "language", "expected"),
+        [
+            ("mangadex", "es", True),
+            ("mangadex", "de", True),
+            ("mangaupdates", "en", True),
+            ("mangaupdates", "de", False),
+            ("anilist", "de", True),  # status only, so language-independent
+            ("feed", "de", True),  # the URL is the reader's own choice
+            ("nope", "en", False),
+        ],
+    )
+    def test_the_registry_answers_without_opening_a_client(
+        self, source_id: str, language: str, expected: bool
+    ) -> None:
+        assert registry.serves(source_id, language) is expected

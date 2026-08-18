@@ -24,17 +24,23 @@ from mangame.store.db import Database
 NOW = datetime(2026, 8, 18, 12, 0, tzinfo=UTC)
 
 
-def chapter(number: str, published_at: datetime, source_id: str = "fake") -> Chapter:
+def chapter(
+    number: str, published_at: datetime, source_id: str = "fake", language: str = "en"
+) -> Chapter:
     return Chapter(
         source_id=source_id,
         external_id=f"{source_id}-{number}",
         number=number,
+        language=language,
         published_at=published_at,
     )
 
 
-def weekly_history(count: int, *, ending: datetime) -> list[Chapter]:
-    return [chapter(str(1190 - i), ending - timedelta(days=7 * i)) for i in reversed(range(count))]
+def weekly_history(count: int, *, ending: datetime, language: str = "en") -> list[Chapter]:
+    return [
+        chapter(str(1190 - i), ending - timedelta(days=7 * i), language=language)
+        for i in reversed(range(count))
+    ]
 
 
 class FakeSource:
@@ -47,6 +53,7 @@ class FakeSource:
         hiatus_flag=True,
         search=False,
         batch_feed=False,
+        languages=frozenset({"en"}),
     )
     min_interval = timedelta(minutes=5)
 
@@ -69,9 +76,6 @@ class FakeSource:
 class FakeRegistry:
     def __init__(self, *sources: FakeSource) -> None:
         self._sources = {s.source_id: s for s in sources}
-
-    def __contains__(self, source_id: str) -> bool:
-        return source_id in self._sources
 
     def get(self, source_id: str) -> FakeSource | None:
         return self._sources.get(source_id)
@@ -342,7 +346,8 @@ class TestPoller:
         poller = Poller(Library(settings_with(), db), db, FakeRegistry(source))
 
         await poller.tick(NOW)
-        db.clear_due()
+        # Naturally due rather than forced: "check now" deliberately drops the
+        # validators, and this is about the routine path replaying them.
         await poller.tick(NOW + timedelta(hours=13))
 
         assert source.calls[-1].validators.etag == 'W/"abc"'
@@ -395,3 +400,73 @@ class TestPoller:
         assert outcomes[0].snapshot is not None
         # Unread still wins over the hiatus flag.
         assert outcomes[0].snapshot.icon_state is IconState.READY
+
+
+class TestLanguageRouting:
+    """The reading language decides who gets asked and whose answer counts."""
+
+    async def test_a_source_that_cannot_serve_the_language_is_not_asked(self, db: Database) -> None:
+        # The fake speaks English only; the reader wants German. Asking anyway
+        # would return English chapters and call them German.
+        source = FakeSource()
+        poller = Poller(Library(settings_with(language="de"), db), db, FakeRegistry(source))
+
+        outcomes = await poller.tick(NOW)
+
+        assert source.calls == []
+        assert outcomes == []
+
+    async def test_a_source_that_serves_the_language_is_asked_for_it(self, db: Database) -> None:
+        source = FakeSource()
+        source.capabilities = FakeSource.capabilities.model_copy(
+            update={"languages": frozenset({"de"})}
+        )
+        poller = Poller(Library(settings_with(language="de"), db), db, FakeRegistry(source))
+
+        await poller.tick(NOW)
+
+        assert [call.language for call in source.calls] == ["de"]
+
+    async def test_a_status_only_source_is_asked_whatever_the_language(self, db: Database) -> None:
+        # AniList's shape: no chapters, just a hiatus flag, which is equally
+        # true in every language.
+        source = FakeSource()
+        source.capabilities = FakeSource.capabilities.model_copy(
+            update={"chapter_timestamps": False, "languages": frozenset()}
+        )
+        poller = Poller(Library(settings_with(language="es"), db), db, FakeRegistry(source))
+
+        await poller.tick(NOW)
+
+        assert len(source.calls) == 1
+
+    def test_chapters_in_another_language_are_not_counted(self, db: Database) -> None:
+        library = Library(settings_with(language="de"), db)
+        signal = SourceSignal(
+            source_id="fake",
+            fetched_at=NOW,
+            chapters=weekly_history(10, ending=NOW - timedelta(days=1)),
+            status=PublicationStatus.ONGOING,
+        )
+
+        assert library.apply(library.configs()[0], [signal], NOW) == 0
+
+        snapshot = library.snapshot_for("one-piece", NOW)
+        assert snapshot is not None
+        assert snapshot.icon_state is not IconState.READY
+        assert snapshot.latest_chapter is None
+
+    def test_chapters_in_the_chosen_language_make_it_ready(self, db: Database) -> None:
+        library = Library(settings_with(language="de"), db)
+        signal = SourceSignal(
+            source_id="fake",
+            fetched_at=NOW,
+            chapters=weekly_history(10, ending=NOW - timedelta(days=1), language="de"),
+            status=PublicationStatus.ONGOING,
+        )
+
+        assert library.apply(library.configs()[0], [signal], NOW) == 10
+
+        snapshot = library.snapshot_for("one-piece", NOW)
+        assert snapshot is not None
+        assert snapshot.icon_state is IconState.READY
