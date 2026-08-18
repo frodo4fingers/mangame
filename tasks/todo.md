@@ -403,3 +403,38 @@ outline behind the fill so only its outer half shows; the stroke is doubled to
 - A real click, synthesised through XTest at the icon's screen coordinates, so
   the whole path was exercised: KDE's panel → StatusNotifierItem → the app.
   The German menu appeared, lifted clear of the taskbar.
+
+## README audit
+
+Checked every factual claim against the code. Four were wrong, three of them
+because the code moved and the prose did not:
+
+| Claim | Was | Is |
+| --- | --- | --- |
+| Database file | `mangame.db` | `state.sqlite3` |
+| Database on Windows | `%LOCALAPPDATA%\mangame` | `%APPDATA%\mangame` — `platformdirs` is constructed with `roaming=True`, so data and config share a directory |
+| Test count | 199 | dropped; a number that has to be edited by hand is a number that will be wrong |
+| SNI left-click | "frequently does not reach the application at all, which is why every action lives in the menu" | it does, and now opens the menu |
+
+Missing features, added:
+
+- **How often it checks.** The whole point of the app, and the README did not
+  say. Now a table of the interval ladder, plus the floors, the jitter and the
+  wall-clock scheduling.
+- **`max_tray_icons`.** One-per-manga mode silently stops at eight icons; a
+  reader with thirty series had no way to find out why.
+- **`series[].enabled`**, which pauses a series without losing its history.
+- **Start on login**, mentioned in Install where someone looks for it.
+
+Generalised away from one desktop: "system tray, notification area, or menu
+bar, whichever your desktop calls it"; per-OS paths spelt out in full for all
+three; the Linux section is now "Desktop support" and says what Windows and
+macOS do before narrowing to SNI and GNOME's extension.
+
+Moved `tools/gen_icons.py` and its `inkscape`/`convert` requirement out of the
+user-facing artwork section and into Development, where a build dependency
+belongs.
+
+- [x] `tests/test_readme.py` pins the machine-checkable facts — file names,
+      icon sizes, state names, language codes, `max_tray_icons` — so the same
+      drift cannot happen twice. 5 of its 17 tests fail against the old README.

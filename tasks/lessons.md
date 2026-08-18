@@ -401,3 +401,23 @@
 - **Rule**: When behaviour depends on a component you do not own, drive it from
   the outside at least once. `XTestFakeButtonEvent` needs `restype`/`argtypes`
   set, or the 64-bit display pointer is truncated to an int.
+
+### Documentation drifts silently; pin the parts a machine can check
+- **What**: The README named the database `mangame.db` (it is `state.sqlite3`),
+  put it in `%LOCALAPPDATA%` on Windows (it is `%APPDATA%`, because
+  `platformdirs` is constructed with `roaming=True`), and claimed 199 tests
+  when there were 469.
+- **Why**: Nothing fails when prose goes stale, so it goes stale.
+- **Rule**: Assert the facts that appear verbatim in both the docs and the
+  code — file names, sizes, enum values, defaults. Leave the prose free. And
+  do not write a number into a README that has to be maintained by hand.
+
+### A README claim can outlive the behaviour it explains
+- **What**: "On SNI-based trays a left-click frequently does not reach the
+  application at all, which is why every action lives in the menu." Measured:
+  it reaches the application, and now opens the menu.
+- **Why**: The sentence was a workaround's justification. Once the workaround
+  went, the justification stayed and became an argument against the fix.
+- **Rule**: When changing behaviour, grep the docs for the *rationale* as well
+  as the description. Explanations of why something is impossible are the
+  first thing to check when it becomes possible.
