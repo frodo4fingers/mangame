@@ -236,3 +236,52 @@
 - **Rule**: Verify a styling call by rendering it and comparing, not by reading
   the docs. Where a style ignores the hint, drop the widget instead of fighting
   it — a bold label groups content perfectly well without a box.
+
+### Ask for the thing the user wants, not the thing the code stores
+- **What**: The artwork tab asked for an emblem *name*, then expected a second,
+  unmentioned trip to another tab to actually use it. A file saved as
+  "hunterxhunter.png" for a series keyed "hunter-x-hunter" imported cleanly,
+  reported success and changed nothing.
+- **Why**: The field mirrored the storage layout — emblems are directories, so
+  the dialog asked for a directory name. The user's intention was never "make
+  me an emblem"; it was "make my manga look like this".
+- **Rule**: Name the field after the intention and derive the identifier. If a
+  task needs two steps in two places, that is one step the design has not
+  finished, and the gap between them is where silent failure lives.
+
+### A confirmation next to the control is one the user can skim past
+- **What**: The fix for "did the name match?" could have been a validation
+  message. Instead the button says *Use for Hunter x Hunter* and is disabled
+  when nothing matched.
+- **Why**: A message is passive and optional; the label on the control you are
+  about to press is neither, and a disabled control makes the wrong outcome
+  unavailable rather than merely discouraged.
+- **Rule**: Put the confirmation in the action. Reserve prose for the case the
+  action cannot express — here, *why* nothing matched and what to do instead.
+
+### Guess out loud, and refuse to guess between two
+- **What**: File names are matched against series by squashing both to letters,
+  so punctuation cannot cause a miss. Where two series match equally, the
+  result is "no match" rather than the first one.
+- **Why**: A wrong guess here is worse than no guess: artwork lands on the
+  wrong manga and everything afterwards looks fine.
+- **Rule**: A guess is acceptable when it is visible and reversible before it
+  commits. Ambiguity is not a weak match, it is the absence of one.
+
+### Reserve space for content, not for its absence
+- **What**: The preview strip kept a fixed cell size so it would not jump when
+  filled — correct — but the empty tab then showed three captions under three
+  blank squares, which reads as breakage.
+- **Why**: "Don't reflow" and "don't show scaffolding" are different problems.
+  Fixed cell sizes solve the first; visibility solves the second.
+- **Rule**: Reserve dimensions within a block, and hide the whole block when it
+  has nothing to say. A layout shift caused by the user's own action is
+  feedback; one caused by content arriving on its own is instability.
+
+### `isVisibleTo()` answers a different question than `setVisible()` asks
+- **What**: Asserting a hidden widget with `isVisibleTo(dialog)` failed even
+  when shown, because the widget sits on a tab page that is not current.
+- **Why**: `isVisibleTo` walks ancestors; `isHidden` reports the widget's own
+  explicit flag, which is what `setVisible` toggles.
+- **Rule**: Test the flag you set. Use `isHidden()` for "did I hide this", and
+  keep `isVisible()` for "is the user actually looking at it".

@@ -262,3 +262,45 @@ and, on a panel at a screen edge, no longer even displayable. Everything with a
       the captions decided the widths, so the row was ragged and jumped when a
       picture was chosen. German wraps to two lines and still lines up.
 - [x] 6 regression tests, each confirmed to fail against the previous layout.
+
+## Importing artwork says which manga it found
+
+Found in the user's own data: artwork imported as `hunterxhunter` while the
+series is keyed `hunter-x-hunter`, so Hunter x Hunter still wore the generated
+badge. The import wrote 36 files, reported success and changed nothing visible.
+
+- [x] The Name field became a **Use for** picker over the tracked manga,
+      preselected by matching the file name.
+- [x] `squash()` compares titles, keys and file names on letters alone, so
+      punctuation cannot be the reason an import lands nowhere.
+- [x] `match_series()` refuses to guess between two candidates — an ambiguous
+      name is not a match.
+- [x] `NameMatch` names the outcome, and the sentence, the button label, the
+      visible fields and whether the import works are derived from it in one
+      place.
+- [x] Importing installs **and** assigns, in one action.
+- [x] "Your artwork" says which manga wears each emblem, or that none does.
+- [x] The empty tab hides the verdict row and the preview block instead of
+      reserving holes for them.
+- [x] 39 new tests; README and architecture doc updated.
+
+### Bugs this removed
+
+1. **A silent no-op import.** The only feedback was "Added “x”. Pick it for a
+   series under Manga." — which reads like success whether or not the name
+   meant anything to the app.
+2. **A stale suggested name.** The name was filled in only when the field was
+   empty, so choosing a second picture kept the first one's name and would
+   have filed it under the wrong emblem.
+3. **The installed list was keyed by its own label.** Removing an emblem read
+   the item's text, which now carries the wearer too; the name comes from the
+   item's data instead.
+
+### Verified, not assumed
+
+- `hunterxhunter.svg`, `Hunter X Hunter.svg` and `onepiece-hat.svg` all match;
+  `bleach-logo.svg` matches nothing, says so in bold, and cannot be imported
+  until a manga is picked.
+- End to end through the real tray: pick the file, one click, config on disk
+  says `emblem='hunter-x-hunter'`, and the tray icon's pixels change.
+- Screenshots of all four states in English and German.

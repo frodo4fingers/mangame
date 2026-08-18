@@ -137,8 +137,8 @@ how often to poll, which icon to draw — is derived from those timestamps. See
 
 ## Your own artwork
 
-**Settings ▸ Artwork** turns any picture into a full emblem. Pick a PNG or SVG,
-give it a name, and mangame derives the other two states for you:
+**Settings ▸ Artwork** turns any picture into a full emblem. Pick a PNG or SVG
+and say which manga it is for; mangame derives the other two states for you:
 
 | State | Derived by |
 | --- | --- |
@@ -149,6 +149,18 @@ give it a name, and mangame derives the other two states for you:
 The grey band is deliberate. Plain luminance would render dark artwork almost
 black, which is exactly what *break* looks like, and at 16 pixels there is no
 detail left to tell them apart by.
+
+**Use for** is preselected from the file name, and says out loud whether it
+found anything: a file called `hunterxhunter.png` matches a manga tracked as
+`hunter-x-hunter`, and the button then reads **Use for Hunter x Hunter**. If
+the name matches nothing — or matches two things equally — it says so and the
+button stays disabled until you pick, because artwork silently landing on no
+manga at all looks exactly like artwork that worked.
+
+Importing installs the picture *and* gives it to that manga, in one step. Pick
+**A shared emblem…** instead to name it yourself and use it for several series;
+the list under **Your artwork** shows which manga wears each one, or that none
+does yet.
 
 **Break style** picks which way round the silhouette goes — dark shape with a
 light rim, or light shape with a dark rim. The preview shows all three states

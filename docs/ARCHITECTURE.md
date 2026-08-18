@@ -263,6 +263,37 @@ dialog's single margin is the one the tab labels already align to. Group boxes
 are labels instead: Fusion draws a box's frame even when the box is asked to be
 flat, and another frame is exactly what was being removed.
 
+### Importing artwork asks which manga, not what to call it
+
+The artwork tab used to ask for a *name*. That is a file system's question, not
+the user's: nobody wants an emblem, they want their manga to look like
+something. Naming it left the actual job — picking it in the Manga tab — as an
+unmentioned second step, and skipping that step was invisible. Artwork saved as
+`hunterxhunter.png` for a series keyed `hunter-x-hunter` installed perfectly
+and changed nothing, because a hyphen is not something a file name is expected
+to get right.
+
+So the tab asks which manga instead, preselected by matching the file name, and
+importing installs *and* assigns in one action. Three rules make the guess
+safe:
+
+- **Compare on squashed letters.** `series_key` turns punctuation into
+  separators, which is right for an identity and too strict for recognising a
+  file. Dropping every non-alphanumeric makes `hunterxhunter`,
+  `hunter-x-hunter` and `Hunter x Hunter` the same word.
+- **Ambiguity is not a match.** Two candidates mean the file name decided
+  nothing. Guessing between them attaches artwork to the wrong manga, and
+  nothing afterwards looks wrong enough to notice.
+- **Say what was found, and let the button carry it.** The verdict line names
+  the manga; the button reads *Use for Hunter x Hunter*. A confirmation you
+  have to click past is one you cannot skim past — which a message beside the
+  field always was. When nothing matches, the button is disabled rather than
+  merely discouraged: the wrong action is unavailable, not just unlabelled.
+
+`NameMatch` names the outcome — idle, matched, chosen, none, shared — and the
+sentence, the button's label, which fields are visible and whether the import
+works are all derived from it in one place, so they cannot disagree.
+
 Threading: `PollWorker` and `SearchWorker` are `QThread`s that each run their
 own asyncio loop and open their **own** SQLite connection (connections are not
 shareable across threads; WAL makes concurrent use safe). `PollWorker` re-reads

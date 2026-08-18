@@ -21,14 +21,20 @@ from mangame.ui import artwork, emblems
 from mangame.ui.settings_dialog import (
     DARK_PANEL,
     LIGHT_PANEL,
+    MIN_PARTIAL_MATCH,
     PAGE_MARGIN,
     PREVIEW_HEIGHT,
     PREVIEW_WIDTH,
+    SHARED_EMBLEM,
+    NameMatch,
     SettingsDialog,
+    classify,
     emblem_choices,
     file_filter,
     heading,
+    match_series,
     split_preview,
+    squash,
     suggested_name,
 )
 
@@ -295,29 +301,109 @@ class TestArtworkTab:
     ) -> None:
         assert dialog._import.isEnabled() is False
 
-    def test_choosing_a_picture_fills_in_a_name(
+    def test_a_picture_named_after_a_manga_is_offered_to_it(
+        self, dialog: SettingsDialog, tmp_path: Path
+    ) -> None:
+        dialog.set_source(picture(tmp_path / "One Piece.png"))
+
+        assert dialog.match() is NameMatch.MATCHED
+        assert dialog.target() == "one-piece"
+        assert dialog._import.isEnabled() is True
+
+    def test_the_button_names_the_manga_it_is_about_to_change(
+        self, dialog: SettingsDialog, tmp_path: Path
+    ) -> None:
+        # The confirmation that the name landed somewhere is the action label,
+        # not a message beside it: a label cannot be read past.
+        dialog.set_source(picture(tmp_path / "one-piece.png"))
+
+        assert dialog._import.text() == "Use for One Piece"
+
+    def test_a_picture_matching_nothing_cannot_be_imported(
+        self, dialog: SettingsDialog, tmp_path: Path
+    ) -> None:
+        # This is the whole point: an unmatched name used to look exactly like
+        # a matched one, and the import went somewhere nobody was looking.
+        dialog.set_source(picture(tmp_path / "bleach-logo.png"))
+
+        assert dialog.match() is NameMatch.NONE
+        assert dialog.target() is None
+        assert dialog._import.isEnabled() is False
+        assert "bleach-logo" in dialog._verdict.text()
+
+    def test_only_the_no_match_line_is_set_in_bold(
+        self, dialog: SettingsDialog, tmp_path: Path
+    ) -> None:
+        dialog.set_source(picture(tmp_path / "bleach-logo.png"))
+        assert dialog._verdict.font().bold() is True
+
+        dialog.set_source(picture(tmp_path / "one-piece.png"))
+        assert dialog._verdict.font().bold() is False
+
+    def test_picking_a_manga_by_hand_unblocks_an_unmatched_picture(
+        self, dialog: SettingsDialog, tmp_path: Path
+    ) -> None:
+        dialog.set_source(picture(tmp_path / "bleach-logo.png"))
+        dialog._target.setCurrentIndex(dialog._target.findData("kagurabachi"))
+
+        assert dialog.match() is NameMatch.CHOSEN
+        assert dialog._import.isEnabled() is True
+        assert dialog._import.text() == "Use for Kagurabachi"
+
+    def test_a_shared_emblem_asks_for_a_name_instead(
         self, dialog: SettingsDialog, tmp_path: Path
     ) -> None:
         dialog.set_source(picture(tmp_path / "Straw Hat.png"))
+        assert dialog._form.isRowVisible(dialog._name_row) is False
 
+        dialog._target.setCurrentIndex(dialog._target.findData(SHARED_EMBLEM))
+
+        assert dialog.match() is NameMatch.SHARED
+        assert dialog._form.isRowVisible(dialog._name_row) is True
         assert dialog._name.text() == "straw-hat"
         assert dialog._import.isEnabled() is True
+
+    def test_clearing_a_shared_name_blocks_the_import(
+        self, dialog: SettingsDialog, tmp_path: Path
+    ) -> None:
+        dialog.set_source(picture(tmp_path / "a.png"))
+        dialog._target.setCurrentIndex(dialog._target.findData(SHARED_EMBLEM))
+        dialog._name.setText("   ")
+
+        assert dialog._import.isEnabled() is False
+
+    def test_the_suggested_name_follows_the_picture(
+        self, dialog: SettingsDialog, tmp_path: Path
+    ) -> None:
+        # Otherwise a second import is filed under the first picture's name.
+        dialog.set_source(picture(tmp_path / "Straw Hat.png"))
+        dialog.set_source(picture(tmp_path / "Cursed Blade.png"))
+
+        assert dialog._name.text() == "cursed-blade"
 
     def test_a_name_the_user_typed_is_left_alone(
         self, dialog: SettingsDialog, tmp_path: Path
     ) -> None:
-        dialog._name.setText("mine")
         dialog.set_source(picture(tmp_path / "Straw Hat.png"))
+        dialog._name.setText("mine")
+        dialog._on_name_typed("mine")
+
+        dialog.set_source(picture(tmp_path / "Cursed Blade.png"))
 
         assert dialog._name.text() == "mine"
 
-    def test_clearing_the_name_blocks_the_import(
+    def test_the_empty_tab_shows_no_verdict_and_no_preview(
         self, dialog: SettingsDialog, tmp_path: Path
     ) -> None:
-        dialog.set_source(picture(tmp_path / "a.png"))
-        dialog._name.setText("   ")
+        # Captions under blank squares read as breakage, not as an example.
+        assert dialog.match() is NameMatch.IDLE
+        assert dialog._form.isRowVisible(dialog._verdict_row) is False
+        assert dialog._preview_box.isHidden() is True
 
-        assert dialog._import.isEnabled() is False
+        dialog.set_source(picture(tmp_path / "a.png"))
+
+        assert dialog._form.isRowVisible(dialog._verdict_row) is True
+        assert dialog._preview_box.isHidden() is False
 
     def test_all_three_states_are_previewed(self, dialog: SettingsDialog, tmp_path: Path) -> None:
         dialog.set_source(picture(tmp_path / "a.png"))
@@ -348,48 +434,83 @@ class TestArtworkTab:
         assert dialog._import.isEnabled() is False
         assert dialog._status.text() == Translator("en")("dialog.settings.art.failed")
 
-    def test_importing_writes_the_emblem_and_announces_it(
+    def test_importing_writes_the_emblem_and_hands_it_to_the_manga(
         self, dialog: SettingsDialog, tmp_path: Path, emblem_home: Path
     ) -> None:
-        seen = Recorder()
-        dialog.artwork_changed.connect(seen)
+        # Installing and assigning are one action because they were always one
+        # intention; separately, an import could appear to work and change
+        # nothing anyone could see.
+        drawn = Recorder()
+        saved = Recorder()
+        dialog.artwork_changed.connect(drawn)
+        dialog.settings_changed.connect(saved)
+
+        dialog.set_source(picture(tmp_path / "One Piece.png"))
+        dialog._import.click()
+
+        assert (emblem_home / "one-piece" / "ready" / "64.png").exists()
+        assert (emblem_home / "one-piece" / "break" / "64.png").exists()
+        assert len(drawn.calls) == 1
+        assert isinstance(saved.last, Settings)
+        assert saved.last.series[0].emblem == "one-piece"
+        assert "One Piece" in dialog._status.text()
+
+    def test_a_shared_emblem_is_installed_without_touching_any_manga(
+        self, dialog: SettingsDialog, tmp_path: Path, emblem_home: Path
+    ) -> None:
+        saved = Recorder()
+        dialog.settings_changed.connect(saved)
 
         dialog.set_source(picture(tmp_path / "Straw Hat.png"))
+        dialog._target.setCurrentIndex(dialog._target.findData(SHARED_EMBLEM))
         dialog._import.click()
 
         assert (emblem_home / "straw-hat" / "ready" / "64.png").exists()
-        assert (emblem_home / "straw-hat" / "break" / "64.png").exists()
-        assert len(seen.calls) == 1
-        assert "straw-hat" in dialog._status.text()
+        assert saved.calls == []
 
     def test_an_imported_emblem_can_be_picked_straight_away(
         self, dialog: SettingsDialog, tmp_path: Path
     ) -> None:
         dialog.set_source(picture(tmp_path / "Straw Hat.png"))
+        dialog._target.setCurrentIndex(dialog._target.findData(SHARED_EMBLEM))
         dialog._import.click()
 
         combo = emblem_combo(dialog, 0)
         assert combo.findData("straw-hat") >= 0
 
-    def test_imported_emblems_are_listed(self, dialog: SettingsDialog, tmp_path: Path) -> None:
+    def test_the_list_says_which_manga_wears_each_emblem(
+        self, dialog: SettingsDialog, tmp_path: Path
+    ) -> None:
+        # An emblem nobody wears looks identical to one that is working, which
+        # is how an import could appear to succeed while changing nothing.
         assert dialog._installed.isEnabled() is False
 
         dialog.set_source(picture(tmp_path / "Straw Hat.png"))
+        dialog._target.setCurrentIndex(dialog._target.findData(SHARED_EMBLEM))
         dialog._import.click()
 
         assert dialog._installed.isEnabled() is True
-        assert dialog._installed.item(0).text() == "straw-hat"
+        assert dialog._installed.item(0).text() == "straw-hat — not used by any manga"
+
+        dialog.set_source(picture(tmp_path / "One Piece.png"))
+        dialog._import.click()
+
+        listed = {dialog._installed.item(i).text() for i in range(dialog._installed.count())}
+        assert "one-piece — One Piece" in listed
 
     def test_an_imported_emblem_can_be_removed_again(
         self, dialog: SettingsDialog, tmp_path: Path, emblem_home: Path
     ) -> None:
         dialog.set_source(picture(tmp_path / "Straw Hat.png"))
+        dialog._target.setCurrentIndex(dialog._target.findData(SHARED_EMBLEM))
         dialog._import.click()
         dialog._installed.setCurrentRow(0)
 
         assert dialog._discard.isEnabled() is True
         dialog._discard.click()
 
+        # The row reads "straw-hat — not used by any manga"; the name it
+        # removes has to come from the item's data, not its label.
         assert not (emblem_home / "straw-hat").exists()
         assert dialog._installed.isEnabled() is False
 
@@ -461,3 +582,83 @@ class TestFlatLayout:
         assert {w.width() for w in dialog._previews.values()} == {PREVIEW_WIDTH}
         assert all(w.height() >= PREVIEW_HEIGHT for w in dialog._previews.values())
         assert [(w.width(), w.height()) for w in dialog._previews.values()] == empty
+
+
+class TestNameMatching:
+    @pytest.mark.parametrize(
+        ("text", "expected"),
+        [
+            ("Hunter x Hunter", "hunterxhunter"),
+            ("hunter-x-hunter", "hunterxhunter"),
+            ("hunterxhunter", "hunterxhunter"),
+            ("Spy × Family", "spyfamily"),  # noqa: RUF001
+            ("", ""),
+        ],
+    )
+    def test_titles_keys_and_file_names_reduce_to_one_form(self, text: str, expected: str) -> None:
+        assert squash(text) == expected
+
+    def test_a_title_always_recognises_itself(self) -> None:
+        # The looser match has to be at least as permissive as the identity
+        # rule, or a file named exactly after a series would still miss it.
+        for entry in settings().series:
+            assert match_series(entry.title, settings().series) == entry.key
+            assert match_series(entry.key, settings().series) == entry.key
+
+    def test_punctuation_is_not_a_reason_to_miss(self) -> None:
+        # The failure that prompted all this: artwork saved as
+        # "hunterxhunter.png" landed nowhere, because the key is
+        # "hunter-x-hunter" and nothing said the two were the same manga.
+        series = [SeriesConfig(key="hunter-x-hunter", title="Hunter x Hunter")]
+
+        assert match_series("hunterxhunter", series) == "hunter-x-hunter"
+        assert match_series("HUNTER X HUNTER", series) == "hunter-x-hunter"
+
+    def test_a_file_name_that_carries_the_title_still_matches(self) -> None:
+        assert match_series("onepiece-hat", settings().series) == "one-piece"
+        assert match_series("one-piece-logo-final", settings().series) == "one-piece"
+
+    def test_a_stub_too_short_to_mean_anything_matches_nothing(self) -> None:
+        short = "one"
+        assert len(short) < MIN_PARTIAL_MATCH
+        assert match_series(short, settings().series) is None
+
+    def test_two_candidates_are_not_a_match(self) -> None:
+        # Guessing between them would attach artwork to the wrong manga, and
+        # nothing afterwards would look wrong enough to notice.
+        series = [
+            SeriesConfig(key="one-piece", title="One Piece"),
+            SeriesConfig(key="one-punch-man", title="One Punch Man"),
+        ]
+        assert match_series("onep", series) is None
+
+    def test_an_exact_match_beats_a_longer_neighbour(self) -> None:
+        series = [
+            SeriesConfig(key="bleach", title="Bleach"),
+            SeriesConfig(key="bleach-remix", title="Bleach Remix"),
+        ]
+        assert match_series("bleach", series) == "bleach"
+
+    @pytest.mark.parametrize("stem", ["", "   ", "!!!"])
+    def test_a_name_with_no_letters_matches_nothing(self, stem: str) -> None:
+        assert match_series(stem, settings().series) is None
+
+    def test_nothing_is_matched_against_an_empty_library(self) -> None:
+        assert match_series("one-piece", []) is None
+
+    @pytest.mark.parametrize(
+        ("source", "chosen", "matched", "expected"),
+        [
+            (None, None, None, NameMatch.IDLE),
+            (None, "one-piece", "one-piece", NameMatch.IDLE),
+            (Path("a.png"), SHARED_EMBLEM, None, NameMatch.SHARED),
+            (Path("a.png"), None, None, NameMatch.NONE),
+            (Path("a.png"), "one-piece", "one-piece", NameMatch.MATCHED),
+            (Path("a.png"), "one-piece", "kagurabachi", NameMatch.CHOSEN),
+            (Path("a.png"), "one-piece", None, NameMatch.CHOSEN),
+        ],
+    )
+    def test_where_the_chosen_manga_came_from(
+        self, source: Path | None, chosen: str | None, matched: str | None, expected: NameMatch
+    ) -> None:
+        assert classify(source, chosen, matched) is expected

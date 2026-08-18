@@ -23,6 +23,8 @@ the user asked for and is handed new settings back, which is what keeps it
 testable without a poller, a database or a display.
 """
 
+from collections.abc import Sequence
+from enum import StrEnum
 from pathlib import Path
 
 from PySide6.QtCore import QSize, Qt, Signal
@@ -41,6 +43,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QListWidget,
+    QListWidgetItem,
     QPushButton,
     QTableWidget,
     QTableWidgetItem,
@@ -51,7 +54,7 @@ from PySide6.QtWidgets import (
 
 from mangame.domain.models import IconState
 from mangame.i18n.catalog import Translator, available
-from mangame.store.config import Settings
+from mangame.store.config import SeriesConfig, Settings
 from mangame.ui import artwork, emblems
 
 #: Preview swatch geometry. Every state is shown on a light *and* a dark
@@ -78,6 +81,86 @@ COMBO_MARGIN = 16
 #: this is the only margin left, and it is the one the tab labels align to.
 PAGE_MARGIN = 12
 PAGE_SPACING = 8
+
+#: Stands in for "not for one particular manga" in the target picker. No series
+#: key can collide with it: keys are ``[a-z0-9-]+``.
+SHARED_EMBLEM = "*shared*"
+
+#: How much of a title a file name has to carry before a partial match counts.
+#: Without a floor, a file called "one.png" would claim One Piece.
+MIN_PARTIAL_MATCH = 4
+
+
+class NameMatch(StrEnum):
+    """What the chosen file name found among the tracked manga.
+
+    Importing artwork exists to give a manga a picture, so the only question
+    worth answering while it happens is *which* manga is about to get it.
+    Naming that outcome keeps the sentence shown, the button's label and
+    whether the button works at all derived from one decision instead of three.
+    """
+
+    IDLE = "idle"
+    """No picture chosen yet; there is nothing to say."""
+
+    MATCHED = "matched"
+    """The file name picked out exactly one tracked manga."""
+
+    CHOSEN = "chosen"
+    """The user pointed at a manga themselves."""
+
+    NONE = "none"
+    """The file name matches nothing, or matches two things equally."""
+
+    SHARED = "shared"
+    """Deliberately not for one manga: a named emblem any of them can wear."""
+
+
+def squash(text: str) -> str:
+    """Reduce a title, a key or a file name to comparable letters.
+
+    :func:`~mangame.store.config.series_key` turns punctuation into separators,
+    which is right for an identity and too strict for recognising a file:
+    someone who saves "hunterxhunter.png" plainly means "Hunter x Hunter", and
+    a hyphen should not be the reason their import lands nowhere.
+    """
+    return "".join(char for char in text.lower() if char.isalnum())
+
+
+def match_series(stem: str, series: Sequence[SeriesConfig]) -> str | None:
+    """The key of the one manga a file name names, or ``None``.
+
+    Ambiguity is not a match. Two candidates mean the file name decided
+    nothing, and guessing between them would hand the artwork to the wrong
+    manga — worse than asking, because nothing would look wrong afterwards.
+    """
+    target = squash(stem)
+    if not target:
+        return None
+
+    exact = {s.key for s in series if target in {squash(s.title), squash(s.key)}}
+    if exact:
+        return exact.pop() if len(exact) == 1 else None
+
+    partial = {
+        s.key
+        for s in series
+        for form in (squash(s.title), squash(s.key))
+        if min(len(form), len(target)) >= MIN_PARTIAL_MATCH
+        and (target.startswith(form) or form.startswith(target))
+    }
+    return partial.pop() if len(partial) == 1 else None
+
+
+def classify(source: Path | None, chosen: str | None, matched: str | None) -> NameMatch:
+    """Where the manga about to receive this picture came from."""
+    if source is None:
+        return NameMatch.IDLE
+    if chosen == SHARED_EMBLEM:
+        return NameMatch.SHARED
+    if chosen is None:
+        return NameMatch.NONE
+    return NameMatch.MATCHED if chosen == matched else NameMatch.CHOSEN
 
 
 def heading(text: str, parent: QWidget) -> QLabel:
@@ -176,6 +259,11 @@ class SettingsDialog(QDialog):
         self._t = translator
         self._settings = settings
         self._source: Path | None = None
+        # The manga the current file name picked out, kept so the dialog can
+        # tell "we guessed this" from "you chose this".
+        self._matched: str | None = None
+        # Whether the emblem name is the user's words or ours.
+        self._name_typed = False
         # Set while widgets are being repopulated, so echoing new settings
         # back into the dialog cannot bounce out as another change.
         self._loading = False
@@ -296,8 +384,18 @@ class SettingsDialog(QDialog):
         picker.addWidget(self._path, 1)
         picker.addWidget(choose)
 
+        self._target = QComboBox(page)
+        self._target.setIconSize(QSize(20, 20))
+        self._target.currentIndexChanged.connect(self._on_target)
+
+        self._verdict = QLabel("", page)
+        self._verdict.setWordWrap(True)
+
         self._name = QLineEdit(page)
         self._name.textChanged.connect(self._on_name_changed)
+        # textEdited fires only for typing, so adopting a suggestion cannot
+        # be mistaken for the user having named the emblem themselves.
+        self._name.textEdited.connect(self._on_name_typed)
 
         self._tone = QComboBox(page)
         self._tone.addItem(
@@ -309,16 +407,24 @@ class SettingsDialog(QDialog):
         self._tone.currentIndexChanged.connect(self.update_preview)
 
         self._previews: dict[IconState, QLabel] = {}
+        # The preview and its heading live in one box so the whole block can
+        # be hidden until there is a picture: captions under empty squares
+        # read as breakage, not as an explanation of what import produces.
+        self._preview_box = QWidget(page)
+        preview_column = QVBoxLayout(self._preview_box)
+        preview_column.setContentsMargins(0, 0, 0, 0)
+        preview_column.setSpacing(2)
+        preview_column.addWidget(heading(self._t("dialog.settings.art.preview"), self._preview_box))
         preview_row = QHBoxLayout()
         preview_row.setSpacing(PAGE_SPACING)
         for state in IconState:
             cell = QVBoxLayout()
             cell.setSpacing(2)
-            swatch = QLabel(page)
+            swatch = QLabel(self._preview_box)
             swatch.setAlignment(Qt.AlignmentFlag.AlignCenter)
             swatch.setFixedWidth(PREVIEW_WIDTH)
             swatch.setMinimumHeight(PREVIEW_HEIGHT)
-            caption = QLabel(self._t(f"state.{state.value}"), page)
+            caption = QLabel(self._t(f"state.{state.value}"), self._preview_box)
             caption.setAlignment(Qt.AlignmentFlag.AlignCenter)
             caption.setFixedWidth(PREVIEW_WIDTH)
             caption.setWordWrap(True)
@@ -328,6 +434,7 @@ class SettingsDialog(QDialog):
             preview_row.addLayout(cell)
             self._previews[state] = swatch
         preview_row.addStretch(1)
+        preview_column.addLayout(preview_row)
 
         self._import = QPushButton(self._t("dialog.settings.art.import"), page)
         self._import.setEnabled(False)
@@ -354,8 +461,15 @@ class SettingsDialog(QDialog):
         form.setContentsMargins(0, 0, 0, 0)
         form.setSpacing(PAGE_SPACING)
         form.addRow(self._t("dialog.settings.art.image"), picker)
+        form.addRow(self._t("dialog.settings.art.for"), self._target)
+        self._verdict_row = form.rowCount()
+        form.addRow("", self._verdict)
+        self._name_row = form.rowCount()
         form.addRow(self._t("dialog.settings.art.name"), self._name)
         form.addRow(self._t("dialog.settings.art.tone"), self._tone)
+        # Only a shared emblem needs naming; for a manga the key is the name.
+        form.setRowVisible(self._name_row, False)
+        self._form = form
 
         actions = QHBoxLayout()
         actions.addStretch(1)
@@ -365,8 +479,7 @@ class SettingsDialog(QDialog):
         layout.setContentsMargins(0, PAGE_SPACING, 0, 0)
         layout.setSpacing(PAGE_SPACING)
         layout.addLayout(form)
-        layout.addWidget(heading(self._t("dialog.settings.art.preview"), page))
-        layout.addLayout(preview_row)
+        layout.addWidget(self._preview_box)
         layout.addLayout(actions)
         layout.addWidget(self._status)
         layout.addWidget(heading(self._t("dialog.settings.art.yours"), page))
@@ -387,8 +500,10 @@ class SettingsDialog(QDialog):
             self._notifications.setChecked(settings.notifications)
             self._single_icon.setChecked(settings.single_tray_icon)
             self._fill_series()
+            self._fill_targets(self._target.currentData())
         finally:
             self._loading = False
+        self.update_preview()
 
     def _fill_series(self) -> None:
         self._series.setRowCount(len(self._settings.series))
@@ -430,12 +545,22 @@ class SettingsDialog(QDialog):
         return name
 
     def refresh_artwork(self) -> None:
-        """Re-read the imported emblem list and the preview."""
+        """Re-read the imported emblem list and the preview.
+
+        Each entry says which manga wears it, because an emblem nobody wears
+        looks identical to one that is working — and that was exactly how an
+        import could appear to succeed while changing nothing.
+        """
         installed = artwork.user_emblems()
         self._installed.clear()
-        self._installed.addItems(installed)
         self._installed.setEnabled(bool(installed))
         self._discard.setEnabled(False)
+        for name in installed:
+            worn_by = [s.title for s in self._settings.series if s.emblem == name]
+            wearer = ", ".join(worn_by) if worn_by else self._t("dialog.settings.art.unused")
+            item = QListWidgetItem(f"{name} — {wearer}")
+            item.setData(Qt.ItemDataRole.UserRole, name)
+            self._installed.addItem(item)
         if not installed:
             self._installed.addItem(self._t("dialog.settings.art.none"))
             self._installed.setEnabled(False)
@@ -450,11 +575,50 @@ class SettingsDialog(QDialog):
         return self._source
 
     def set_source(self, path: Path | None) -> None:
-        """Adopt a picture, filling in a name if the field is still untouched."""
+        """Adopt a picture and say which manga, if any, its name names."""
         self._source = path
         self._path.setText(str(path) if path else "")
-        if path is not None and not self._name.text().strip():
+        self._matched = match_series(path.stem, self._settings.series) if path else None
+        # The suggestion follows the picture; a name the user typed does not,
+        # or a second import would quietly be filed under the first one's name.
+        if path is not None and not self._name_typed:
             self._name.setText(suggested_name(path))
+        self._status.clear()
+        # A new file re-asks the question, so an earlier answer is not kept.
+        self._fill_targets(self._matched)
+        self.update_preview()
+
+    def target(self) -> str | None:
+        """The key of the manga this picture is destined for, if one."""
+        data = self._target.currentData()
+        return data if isinstance(data, str) and data != SHARED_EMBLEM else None
+
+    def match(self) -> NameMatch:
+        """What the current file name found among the tracked manga."""
+        return classify(self._source, self._target.currentData(), self._matched)
+
+    def _title_of(self, key: str | None) -> str:
+        return next((s.title for s in self._settings.series if s.key == key), "")
+
+    def _fill_targets(self, preselect: str | None) -> None:
+        """Offer every tracked manga, preselecting the one the name found."""
+        was_loading = self._loading
+        self._loading = True
+        try:
+            self._target.clear()
+            self._target.addItem(self._t("dialog.settings.art.for.none"), None)
+            for entry in self._settings.series:
+                icon = emblems.icon_for(entry.emblem, IconState.READY, entry.title)
+                self._target.addItem(icon, entry.title, entry.key)
+            self._target.addItem(self._t("dialog.settings.art.for.shared"), SHARED_EMBLEM)
+            index = self._target.findData(preselect) if preselect else 0
+            self._target.setCurrentIndex(max(0, index))
+        finally:
+            self._loading = was_loading
+
+    def _on_target(self, _index: int) -> None:
+        if self._loading:
+            return
         self._status.clear()
         self.update_preview()
 
@@ -469,16 +633,42 @@ class SettingsDialog(QDialog):
             self.set_source(Path(chosen))
 
     def update_preview(self) -> None:
-        """Render the three states from the chosen picture, or clear them."""
-        ready = bool(self._source and self._name.text().strip())
-        self._import.setEnabled(ready)
+        """Recompute everything the chosen picture and manga imply.
 
-        for state, swatch in self._previews.items():
+        The sentence, the button's label and whether it works at all are all
+        derived here from one :class:`NameMatch`, so they cannot disagree —
+        which is the failure this tab had: a name that matched nothing looked
+        exactly like a name that matched, and the import quietly went nowhere.
+        """
+        state = self.match()
+        title = self._title_of(self.target())
+        stem = self._source.stem if self._source else ""
+
+        self._verdict.setText(self._verdict_text(state, stem, title))
+        # Nothing matched is the one case that needs weight: it is the only
+        # one where the user has to act before anything can happen.
+        font = self._verdict.font()
+        font.setBold(state is NameMatch.NONE)
+        self._verdict.setFont(font)
+
+        self._form.setRowVisible(self._name_row, state is NameMatch.SHARED)
+        # An empty verdict and empty swatches are holes in the form; both only
+        # have something to say once a picture has been chosen.
+        self._form.setRowVisible(self._verdict_row, state is not NameMatch.IDLE)
+        self._preview_box.setVisible(state is not NameMatch.IDLE)
+        self._import.setText(
+            self._t("dialog.settings.art.import.for").format(title=title)
+            if title
+            else self._t("dialog.settings.art.import")
+        )
+        self._import.setEnabled(self._can_import(state))
+
+        for state_key, swatch in self._previews.items():
             if self._source is None:
                 swatch.clear()
                 continue
             try:
-                image = artwork.state_image(self._source, state, 64, self.tone())
+                image = artwork.state_image(self._source, state_key, 64, self.tone())
             except artwork.UnsupportedArtworkError:
                 swatch.clear()
                 self._status.setText(self._t("dialog.settings.art.failed"))
@@ -486,18 +676,49 @@ class SettingsDialog(QDialog):
                 continue
             swatch.setPixmap(QPixmap.fromImage(split_preview(image)))
 
+    def _verdict_text(self, state: NameMatch, stem: str, title: str) -> str:
+        key = {
+            NameMatch.IDLE: "",
+            NameMatch.MATCHED: "dialog.settings.art.verdict.matched",
+            NameMatch.CHOSEN: "dialog.settings.art.verdict.chosen",
+            NameMatch.NONE: "dialog.settings.art.verdict.none",
+            NameMatch.SHARED: "dialog.settings.art.verdict.shared",
+        }[state]
+        return self._t(key).format(name=stem, title=title) if key else ""
+
+    def _can_import(self, state: NameMatch) -> bool:
+        if self._source is None:
+            return False
+        if state is NameMatch.SHARED:
+            return bool(self._name.text().strip())
+        return state in {NameMatch.MATCHED, NameMatch.CHOSEN}
+
     def import_artwork(self) -> None:
-        """Write the three states to disk under the chosen name."""
+        """Write the three states to disk, and hand them to the chosen manga.
+
+        Installing and assigning are one action because they were always one
+        intention. Splitting them is what let a picture be imported under a
+        name no series wore, leaving the manga looking untouched.
+        """
         if self._source is None:
             return
+        key = self.target()
+        raw = key or self._name.text()
+        if not raw.strip():
+            return
         try:
-            name = artwork.install(self._source, self._name.text(), self.tone())
+            name = artwork.install(self._source, raw, self.tone())
         except artwork.UnsupportedArtworkError:
             self._status.setText(self._t("dialog.settings.art.failed"))
             return
 
-        self._status.setText(self._t("dialog.settings.art.installed").format(name=name))
         self.artwork_changed.emit()
+        if key is None:
+            self._status.setText(self._t("dialog.settings.art.installed").format(name=name))
+        else:
+            title = self._title_of(key)
+            self._status.setText(self._t("dialog.settings.art.assigned").format(title=title))
+            self._apply(self._settings.with_series_change(key, emblem=name))
         self.refresh_artwork()
         self.set_settings(self._settings)
 
@@ -505,7 +726,7 @@ class SettingsDialog(QDialog):
         item = self._installed.currentItem()
         if item is None or not self._installed.isEnabled():
             return
-        name = item.text()
+        name = item.data(Qt.ItemDataRole.UserRole)
         if not artwork.uninstall(name):
             return
         self._status.setText(self._t("dialog.settings.art.removed").format(name=name))
@@ -519,7 +740,10 @@ class SettingsDialog(QDialog):
         )
 
     def _on_name_changed(self, _text: str) -> None:
-        self._import.setEnabled(bool(self._source and self._name.text().strip()))
+        self.update_preview()
+
+    def _on_name_typed(self, _text: str) -> None:
+        self._name_typed = True
 
     # --------------------------------------------------------------- edits
 
