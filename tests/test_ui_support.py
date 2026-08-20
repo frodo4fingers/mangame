@@ -84,7 +84,17 @@ BUNDLED = ["onepiece", "book", "mangame"]
 
 
 class TestEmblems:
-    def test_the_committed_pixels_match_the_generated_artwork_contract(self) -> None:
+    def test_the_committed_files_match_the_generated_artwork_contract(self) -> None:
+        assert gen_icons.contract_problems() == []
+
+    def test_the_contract_does_not_rerender_pixels_on_each_platform(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(
+            gen_icons,
+            "_expected",
+            lambda *_args: pytest.fail("the check invoked the platform renderer"),
+        )
         assert gen_icons.contract_problems() == []
 
     @pytest.mark.parametrize("emblem", BUNDLED)
@@ -194,6 +204,10 @@ class TestMonogramFallback:
     that used to resolve through a "book" fallback — so every one of them wore
     the identical stand-in and the generated badge was unreachable.
     """
+
+    @pytest.fixture(autouse=True)
+    def _isolated_emblems(self, emblem_home: Path) -> None:
+        """A real drop-in must never change the bundled-artwork tests."""
 
     @staticmethod
     def rendered(emblem: str, title: str, state: IconState = IconState.READY) -> bytes:

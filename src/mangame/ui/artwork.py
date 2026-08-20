@@ -33,7 +33,7 @@ from PySide6.QtSvg import QSvgRenderer
 
 from mangame.domain.models import IconState
 from mangame.store import paths
-from mangame.ui.emblems import emblem_name as emblem_name
+from mangame.ui.emblem_names import emblem_name as emblem_name
 from mangame.ui.emblems import forget_artwork
 
 LOG = logging.getLogger(__name__)

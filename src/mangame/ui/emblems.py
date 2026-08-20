@@ -29,6 +29,7 @@ from PySide6.QtGui import QColor, QFont, QIcon, QPainter, QPen, QPixmap
 
 from mangame.domain.models import IconState
 from mangame.store import paths
+from mangame.ui.emblem_names import emblem_name
 
 BUNDLED_DIR = Path(__file__).resolve().parent.parent / "assets" / "emblems"
 
@@ -42,12 +43,6 @@ _MONOGRAM_STYLE: dict[IconState, tuple[float, float, str, str]] = {
     IconState.DUE: (0.0, 0.66, "#FFFFFF", "#00000055"),
     IconState.BREAK: (0.0, 0.14, "#8C8C8C", "#D2D2D2D9"),
 }
-
-
-def emblem_name(raw: str) -> str:
-    """Fold a title or user name into something usable as a directory name."""
-    cleaned = "".join(char if char.isalnum() else "-" for char in raw.strip().lower())
-    return "-".join(part for part in cleaned.split("-") if part)
 
 
 def emblem_roots() -> tuple[Path, ...]:

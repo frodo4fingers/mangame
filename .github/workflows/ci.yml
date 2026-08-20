@@ -40,9 +40,7 @@ jobs:
         with:
           enable-cache: true
 
-      - run: uv sync --locked --extra dev --python ${{ matrix.python }}
-
-      - run: uv run pytest -q
+      - run: uv run --locked --extra dev --python ${{ matrix.python }} python -m pytest -q
 
   lint:
     name: lint
@@ -109,12 +107,12 @@ jobs:
           uv venv /tmp/smoke --python 3.12
           VIRTUAL_ENV=/tmp/smoke uv pip install dist/*.whl
           MANGAME_HOME=/tmp/smoke-home /tmp/smoke/bin/python - <<'PY'
+          from importlib.resources import files
           from pathlib import Path
 
           from mangame.store import paths
-          from mangame.ui import emblems
 
-          bundled = emblems.BUNDLED_DIR
+          bundled = files("mangame").joinpath("assets", "emblems")
           assert bundled.is_dir(), f"no emblem directory at {bundled}"
           shipped = {d.name for d in bundled.iterdir() if d.is_dir()}
           assert {"mangame", "onepiece", "book"} <= shipped, shipped
