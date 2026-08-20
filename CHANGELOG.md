@@ -6,8 +6,24 @@ uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.0]
+
+First release.
+
+The `v0.1.0` tag is unsigned because tag signing was not configured for this
+initial release.
+
 ### Added
 
+- A tray icon per series, or one icon for the whole library, in three states:
+  full colour when a chapter is waiting, grey when the next one is due, and a
+  dark silhouette when a break has been announced.
+- Polling that adapts to each series: rare while a title is far from its next
+  chapter, frequent as the window approaches, and backing off again for
+  dormant or ended series.
+- Reading language as a first-class setting, with sources chosen to match it.
+- Break detection from source metadata and from the gaps between releases.
+- Start on login for Linux, Windows and macOS.
 - A Diagnostics tab with copyable runtime and support-file information, plus
   rotating local logs for packaged GUI builds that have no console.
 - A stream-free packaged smoke test that cannot hang a release indefinitely.
@@ -24,9 +40,8 @@ uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
   alone.
 - Standalone builds for Linux, Windows and both macOS architectures, produced
   and smoke-tested by the release workflow.
-- Continuous integration across three operating systems and two Python
-  versions, including a check that an installed wheel can still find its
-  artwork.
+- Continuous integration across three operating systems and Python 3.12–3.14,
+  including a check that an installed wheel can still find its artwork.
 - `AGENTS.md`, so the project's conventions travel with the repository instead
   of living in one maintainer's editor settings.
 - A git-ignored `.env` for machine-local paths, with `.env.example` as the
@@ -40,22 +55,8 @@ uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 - Test isolation no longer relies on the XDG variables, which Windows ignores;
   running the suite there would have written into the real user profile.
-
-## [0.1.0]
-
-First release.
-
-- A tray icon per series, or one icon for the whole library, in three states:
-  full colour when a chapter is waiting, grey when the next one is due, and a
-  dark silhouette when a break has been announced.
-- Polling that adapts to each series: rare while a title is far from its next
-  chapter, frequent as the window approaches, and backing off again for
-  dormant or ended series.
-- Reading language as a first-class setting, with sources chosen to match it.
-- Break detection from source metadata and from the gaps between releases.
-- Bundled emblems, plus drop-in artwork of your own converted to all three
-  states on import.
-- Start on login for Linux, Windows and macOS.
+- Cross-platform CI now runs tests with the requested interpreter and validates
+  generated artwork without depending on platform-specific Qt rasterisation.
 
 [Unreleased]: https://github.com/frodo4fingers/mangame/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/frodo4fingers/mangame/releases/tag/v0.1.0
