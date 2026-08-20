@@ -270,47 +270,39 @@ how often to poll, which icon to draw — is derived from those timestamps. See
 
 ## Your own artwork
 
-**Settings ▸ Artwork** turns any picture into a full emblem. Pick a PNG or SVG
-and say which manga it is for; mangame derives the other two states for you:
+Drop one PNG named for the manga into the user emblem directory:
 
-| State | Derived by |
-| --- | --- |
-| ready | your picture, unchanged |
-| due | luminance, remapped into a mid-grey band |
-| break | a flat silhouette with a rim in the opposite tone |
+```text
+emblems/<manga>.png
 
-The grey band is deliberate. Plain luminance would render dark artwork almost
-black, which is exactly what *break* looks like, and at 16 pixels there is no
-detail left to tell them apart by.
+# for example
+emblems/Hunter x Hunter.png
+```
 
-**Use for** is preselected from the file name, and says out loud whether it
-found anything: a file called `hunterxhunter.png` matches a manga tracked as
-`hunter-x-hunter`, and the button then reads **Use for Hunter x Hunter**. If
-the name matches nothing — or matches two things equally — it says so and the
-button stays disabled until you pick, because artwork silently landing on no
-manga at all looks exactly like artwork that worked.
+On the next refresh mangame creates the ready, due and break versions behind
+it. The filename is matched to the tracked title, so that example is used by
+`hunter-x-hunter` without editing config. Replace the source PNG to regenerate
+it.
+
+**Settings ▸ Artwork** is the same workflow with a file picker. It also accepts
+SVG and other common image formats, stores one normalised PNG, and says which
+manga the filename matched before importing.
 
 Importing installs the picture *and* gives it to that manga, in one step. Pick
 **A shared emblem…** instead to name it yourself and use it for several series;
 the list under **Your artwork** shows which manga wears each one, or that none
 does yet.
 
-**Break style** picks which way round the silhouette goes — dark shape with a
-light rim, or light shape with a dark rim. The preview shows all three states
-on a light *and* a dark panel, so you can see which one survives on yours. The
-rim is what keeps either choice visible on the other background.
+The generated files are:
 
-SVGs are re-rendered at every icon size rather than scaled from one bitmap, so
-small tray sizes stay crisp. Non-square pictures keep their proportions.
-
-Emblems land in the user emblem directory and can be dropped in by hand too:
-
-```
-emblems/<name>/<ready|due|break>/<16|18|20|22|24|32|36|44|48|64|128|256>.png
+```text
+emblems/<name>/<ready|due|break>.png
 ```
 
-User artwork takes priority over the bundled sets, so you can override
-`onepiece` or `book` without touching the installation.
+Ready keeps the source colour, due is remapped into a mid-grey band, and break
+is a near-black silhouette with a near-white rim. The rim keeps it visible on
+both light and dark panels. Qt scales the 256px state image to the size the
+panel requests; a separate file for every possible panel size is unnecessary.
 
 Any series whose emblem is *Generated badge* — or whose artwork has gone
 missing — gets a monogram: its initial on a colour derived from the title. Two
@@ -352,22 +344,19 @@ The domain layer (`src/mangame/domain/`) is pure: no I/O, no clock, no
 network — the current time is always passed in. That is what makes the
 release-rhythm, break-detection and scheduling rules directly testable.
 
-The bundled artwork is generated, not committed by hand. `tools/gen_icons.py`
-draws each emblem in three palettes and rasterises every tray size; it needs
-`inkscape` and ImageMagick's `convert` on `PATH`. Re-run it after editing a
-shape or a palette, optionally naming one emblem:
+Bundled artwork follows the same one-PNG rule. Drop an original source into
+`artwork/`, then generate the three state files:
 
 ```bash
-uv run python tools/gen_icons.py --check   # no renderer needed
 uv run python tools/gen_icons.py           # all of them
-uv run python tools/gen_icons.py mangame   # just the M
+uv run python tools/gen_icons.py mangame   # one source
+uv run python tools/gen_icons.py --check
 ```
 
-The approved small-size comparison and contribution rules are in
-[`docs/ARTWORK.md`](docs/ARTWORK.md).
+No external renderer is needed. See [`docs/ARTWORK.md`](docs/ARTWORK.md).
 
-The installer icons in `packaging/icons/` come from the same drawing, rendered
-larger and packed into the containers Windows and macOS require:
+The installer icons in `packaging/icons/` come from `artwork/mangame.png` and
+are packed into the containers Windows and macOS require:
 
 ```bash
 uv run python tools/gen_app_icon.py

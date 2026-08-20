@@ -1,9 +1,8 @@
 """Turning one picture into a three-state emblem set.
 
 The tray says three things with one shape: full colour means ready, grey means
-the week is due, near-black means a break was announced. Bundled emblems get
-that for free — they are drawn three times from three palettes. Anything a user
-brings is a single picture, so the other two states have to be derived.
+the week is due, near-black means a break was announced. Every emblem begins as
+one picture, and the other two states are derived.
 
 Two transforms do it:
 
@@ -12,19 +11,20 @@ band. Plain luminance would be honest and useless: artwork that is mostly dark
 comes out nearly black, which is exactly what the *break* state looks like, and
 the entire point is that the three states are told apart at 16 pixels.
 
-**Silhouette** flattens everything opaque to one tone and rings it in the
-opposite one. A dark silhouette vanishes on a dark panel and a light one
-vanishes on a light panel, so whichever is chosen, the rim is what keeps the
-icon visible on the other. The rim is grown outwards from the alpha channel,
-and the artwork is inset by exactly that much so the halo is never clipped.
+**Silhouette** flattens everything opaque to near-black and rings it in
+near-white. The rim is what keeps the icon visible on a dark panel. It is grown
+outwards from the alpha channel, and the artwork is inset by exactly that much
+so the halo is never clipped.
 
 Every operation is a Qt composition on :class:`QImage`, which — unlike
 ``QPixmap`` — needs no display, no ``QApplication`` and no window system. That
 is what keeps this fast enough for a live preview and testable headlessly.
 """
 
+import json
+import logging
 import math
-from enum import StrEnum
+import shutil
 from pathlib import Path
 
 from PySide6.QtCore import QRectF, Qt
@@ -33,10 +33,13 @@ from PySide6.QtSvg import QSvgRenderer
 
 from mangame.domain.models import IconState
 from mangame.store import paths
-from mangame.ui.emblems import SIZES, forget_artwork
+from mangame.ui.emblems import emblem_name as emblem_name
+from mangame.ui.emblems import forget_artwork
 
-#: Extensions a user may hand us. SVG is rendered at each target size rather
-#: than scaled up from one bitmap, so small tray sizes stay crisp.
+LOG = logging.getLogger(__name__)
+
+#: Extensions accepted by the Settings file picker. Every import is normalised
+#: to the source PNG from which the three stored states are generated.
 VECTOR_SUFFIXES = frozenset({".svg", ".svgz"})
 RASTER_SUFFIXES = frozenset({".png", ".webp", ".jpg", ".jpeg", ".bmp", ".gif"})
 SUPPORTED_SUFFIXES = VECTOR_SUFFIXES | RASTER_SUFFIXES
@@ -46,23 +49,16 @@ SUPPORTED_SUFFIXES = VECTOR_SUFFIXES | RASTER_SUFFIXES
 GREY_FLOOR = 0.34
 GREY_CEILING = 0.86
 
+#: One generated file per state is enough; QIcon scales it for the panel.
+OUTPUT_SIZE = 256
 
-class SilhouetteTone(StrEnum):
-    """Which way round a silhouette is drawn."""
+#: User imports are normalised to one PNG, which remains the source of truth.
+SOURCE_SIZE = 1024
+DROPIN_VERSION = 1
+MARKER = ".source.json"
 
-    DARK = "dark"
-    """Near-black shape, light rim. Reads best on a light panel."""
-
-    LIGHT = "light"
-    """Near-white shape, dark rim. Reads best on a dark panel."""
-
-
-#: Fill and rim per tone, matching the palettes ``tools/gen_icons.py`` uses for
-#: the bundled artwork.
-TONES: dict[SilhouetteTone, tuple[str, str]] = {
-    SilhouetteTone.DARK: ("#232323", "#D2D2D2"),
-    SilhouetteTone.LIGHT: ("#EDEDED", "#2B2B2B"),
-}
+BREAK_FILL = "#232323"
+BREAK_RIM = "#D2D2D2"
 
 
 class UnsupportedArtworkError(Exception):
@@ -169,14 +165,13 @@ def grayscale(image: QImage) -> QImage:
     return remapped
 
 
-def silhouette(image: QImage, tone: SilhouetteTone = SilhouetteTone.DARK) -> QImage:
-    """Flatten to one tone and ring the shape in the opposite one."""
-    fill, rim = TONES[tone]
+def silhouette(image: QImage) -> QImage:
+    """Flatten to near-black and ring the shape in near-white."""
     source = image.convertToFormat(QImage.Format.Format_ARGB32)
 
-    result = _ring(source, QColor(rim), rim_width(max(source.width(), source.height())))
+    result = _ring(source, QColor(BREAK_RIM), rim_width(max(source.width(), source.height())))
     painter = QPainter(result)
-    painter.drawImage(0, 0, _tinted(source, QColor(fill)))
+    painter.drawImage(0, 0, _tinted(source, QColor(BREAK_FILL)))
     painter.end()
     return result
 
@@ -237,7 +232,6 @@ def state_image(
     source: Path,
     state: IconState,
     size: int,
-    tone: SilhouetteTone = SilhouetteTone.DARK,
 ) -> QImage:
     """The imported artwork as it should look in one icon state."""
     if state is IconState.READY:
@@ -245,17 +239,91 @@ def state_image(
     if state is IconState.DUE:
         return grayscale(load(source, size))
     # The rim grows outwards, so the art is inset by exactly the ring it needs.
-    return silhouette(_inset(load(source, size), rim_width(size)), tone)
+    return silhouette(_inset(load(source, size), rim_width(size)))
 
 
-def emblem_name(raw: str) -> str:
-    """Fold a user-typed name into something usable as a directory name."""
-    cleaned = "".join(char if char.isalnum() else "-" for char in raw.strip().lower())
-    return "-".join(part for part in cleaned.split("-") if part)
+def _signature(source: Path) -> dict[str, int | str]:
+    stat = source.stat()
+    return {
+        "version": DROPIN_VERSION,
+        "source": source.name,
+        "size": stat.st_size,
+        "mtime_ns": stat.st_mtime_ns,
+    }
 
 
-def install(source: Path, name: str, tone: SilhouetteTone = SilhouetteTone.DARK) -> str:
-    """Write ``source`` into the user emblem directory as a full state set.
+def _marker(output: Path) -> Path:
+    return output / MARKER
+
+
+def _is_current(source: Path, output: Path) -> bool:
+    try:
+        recorded = json.loads(_marker(output).read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return False
+    expected = _signature(source)
+    return recorded == expected and all(
+        (output / f"{state.value}.png").is_file() for state in IconState
+    )
+
+
+def _generate(source: Path, name: str) -> None:
+    """Replace one generated directory from its source PNG."""
+    rendered = {state: state_image(source, state, OUTPUT_SIZE) for state in IconState}
+    signature = _signature(source)
+    output = paths.user_emblem_dir() / name
+    if output.exists():
+        shutil.rmtree(output)
+    output.mkdir()
+    for state, image in rendered.items():
+        target = output / f"{state.value}.png"
+        if not image.save(str(target)):
+            raise OSError(f"could not write {target}")
+    _marker(output).write_text(
+        json.dumps(signature, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    forget_artwork()
+
+
+def sync_dropins() -> list[str]:
+    """Generate root-level PNGs dropped into the user emblem directory.
+
+    A file named ``Hunter x Hunter.png`` becomes the ``hunter-x-hunter``
+    emblem. A small metadata marker skips rendering unchanged sources, so
+    calling this from the tray's refresh timer is cheap.
+    """
+    root = paths.user_emblem_dir()
+    grouped: dict[str, list[Path]] = {}
+    for source in sorted(root.glob("*.png")):
+        name = emblem_name(source.stem)
+        if name:
+            grouped.setdefault(name, []).append(source)
+
+    generated: list[str] = []
+    for name, candidates in grouped.items():
+        if len(candidates) != 1:
+            LOG.warning(
+                "several dropped PNGs resolve to %s: %s",
+                name,
+                ", ".join(path.name for path in candidates),
+            )
+            continue
+        source = candidates[0]
+        output = root / name
+        try:
+            if _is_current(source, output):
+                continue
+            _generate(source, name)
+        except (OSError, UnsupportedArtworkError) as exc:
+            LOG.warning("could not generate emblem from %s: %s", source, exc)
+            continue
+        generated.append(name)
+    return generated
+
+
+def install(source: Path, name: str) -> str:
+    """Store one source PNG and derive its three state images.
 
     Returns the folded name the emblem was stored under, which is what a series
     config then refers to. User artwork shadows bundled artwork of the same
@@ -265,30 +333,38 @@ def install(source: Path, name: str, tone: SilhouetteTone = SilhouetteTone.DARK)
     if not folder:
         raise UnsupportedArtworkError("an emblem needs a name")
 
-    root = paths.user_emblem_dir() / folder
-    for state in IconState:
-        out_dir = root / state.value
-        out_dir.mkdir(parents=True, exist_ok=True)
-        for size in SIZES:
-            state_image(source, state, size, tone).save(str(out_dir / f"{size}.png"))
-    forget_artwork()
+    root = paths.user_emblem_dir()
+    stored = root / f"{folder}.png"
+    if source.resolve() != stored.resolve():
+        image = load(source, SOURCE_SIZE)
+        if not image.save(str(stored)):
+            raise OSError(f"could not write {stored}")
+    _generate(stored, folder)
     return folder
 
 
 def uninstall(name: str) -> bool:
     """Remove a user-installed emblem. Bundled artwork is never touched."""
-    root = paths.user_emblem_dir() / emblem_name(name)
+    home = paths.user_emblem_dir()
+    root = home / emblem_name(name)
     if not root.is_dir():
         return False
-    for child in sorted(root.rglob("*"), reverse=True):
-        child.rmdir() if child.is_dir() else child.unlink()
-    root.rmdir()
+    source_name = f"{emblem_name(name)}.png"
+    try:
+        marker = json.loads(_marker(root).read_text(encoding="utf-8"))
+        if isinstance(marker.get("source"), str):
+            source_name = marker["source"]
+    except (json.JSONDecodeError, OSError):
+        pass
+    shutil.rmtree(root)
+    (home / source_name).unlink(missing_ok=True)
     forget_artwork()
     return True
 
 
 def user_emblems() -> list[str]:
     """Emblem names the user installed, as opposed to the bundled ones."""
+    sync_dropins()
     root = paths.user_emblem_dir()
     if not root.is_dir():
         return []

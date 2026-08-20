@@ -23,10 +23,12 @@ body:
       required: true
 
   - type: textarea
-    id: states
+    id: source
     attributes:
-      label: How should all three states remain distinct?
-      description: Consider ready in colour, due in grey and break as a rimmed silhouette.
+      label: Source PNG
+      description: >
+        If you have a mock-up, attach the single colour PNG that should be used
+        as the source. mangame generates the grey and silhouette states.
     validations:
       required: true
 

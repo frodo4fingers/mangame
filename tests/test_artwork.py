@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QColor, QImage, QPainter
+from PySide6.QtGui import QColor, QIcon, QImage, QPainter
 
 from mangame.domain.models import IconState
 from mangame.ui import artwork, emblems
@@ -122,7 +122,7 @@ class TestGrayscale:
         # The whole reason for the band: plain luminance would render dark
         # artwork near-black, which is exactly what "on break" looks like.
         grey = artwork.grayscale(flat("#101010")).pixelColor(4, 4).red()
-        silhouette_fill = QColor(artwork.TONES[artwork.SilhouetteTone.DARK][0]).red()
+        silhouette_fill = QColor(artwork.BREAK_FILL).red()
         assert grey - silhouette_fill > 50
 
     def test_brighter_input_stays_brighter(self) -> None:
@@ -138,35 +138,23 @@ class TestGrayscale:
 
 
 class TestSilhouette:
-    @pytest.mark.parametrize("tone", list(artwork.SilhouetteTone))
-    def test_the_body_is_flattened_to_one_tone(
-        self, tmp_path: Path, tone: artwork.SilhouetteTone
-    ) -> None:
+    def test_the_body_is_flattened_to_near_black(self, tmp_path: Path) -> None:
         image = artwork.load(disc(tmp_path / "a.png"), 64)
-        result = artwork.silhouette(artwork._inset(image, 2), tone)
-        expected = QColor(artwork.TONES[tone][0]).name()
+        result = artwork.silhouette(artwork._inset(image, 2))
+        expected = QColor(artwork.BREAK_FILL).name()
         # The two source colours must have become the same one.
         assert result.pixelColor(32, 32).name() == expected
         assert result.pixelColor(32, 22).name() == expected
 
-    @pytest.mark.parametrize("tone", list(artwork.SilhouetteTone))
-    def test_the_shape_is_ringed_in_the_contrasting_tone(
-        self, tmp_path: Path, tone: artwork.SilhouetteTone
-    ) -> None:
+    def test_the_shape_is_ringed_in_near_white(self, tmp_path: Path) -> None:
         # Without this rim a dark silhouette vanishes on a dark panel.
         image = artwork.load(disc(tmp_path / "a.png"), 64)
-        result = artwork.silhouette(artwork._inset(image, 2), tone)
+        result = artwork.silhouette(artwork._inset(image, 2))
 
         row = [result.pixelColor(x, 32) for x in range(64)]
         first = next(x for x, pixel in enumerate(row) if pixel.alpha() > 200)
-        assert row[first].name() == QColor(artwork.TONES[tone][1]).name()
-        assert row[32].name() == QColor(artwork.TONES[tone][0]).name()
-
-    def test_the_two_tones_are_opposites(self) -> None:
-        dark_fill, dark_rim = artwork.TONES[artwork.SilhouetteTone.DARK]
-        light_fill, light_rim = artwork.TONES[artwork.SilhouetteTone.LIGHT]
-        assert QColor(dark_fill).lightness() < QColor(dark_rim).lightness()
-        assert QColor(light_fill).lightness() > QColor(light_rim).lightness()
+        assert row[first].name() == QColor(artwork.BREAK_RIM).name()
+        assert row[32].name() == QColor(artwork.BREAK_FILL).name()
 
     def test_the_rim_never_runs_off_the_canvas(self, tmp_path: Path) -> None:
         # A picture drawn edge to edge still has to fit its halo, so
@@ -177,7 +165,7 @@ class TestSilhouette:
         edge.save(str(path))
 
         result = artwork.state_image(path, IconState.BREAK, 64)
-        rim = QColor(artwork.TONES[artwork.SilhouetteTone.DARK][1]).name()
+        rim = QColor(artwork.BREAK_RIM).name()
         assert result.pixelColor(0, 32).name() == rim
         assert result.pixelColor(63, 32).name() == rim
 
@@ -235,13 +223,17 @@ class TestNaming:
 
 
 class TestInstalling:
-    def test_every_state_and_size_is_written(self, tmp_path: Path, emblem_home: Path) -> None:
+    def test_one_source_and_one_file_per_state_are_written(
+        self, tmp_path: Path, emblem_home: Path
+    ) -> None:
         name = artwork.install(disc(tmp_path / "a.png"), "My Hat")
 
         assert name == "my-hat"
+        assert (emblem_home / "my-hat.png").is_file()
         for state in IconState:
-            written = {int(p.stem) for p in (emblem_home / name / state.value).glob("*.png")}
-            assert set(emblems.SIZES) <= written
+            image = QImage(str(emblem_home / name / f"{state.value}.png"))
+            assert image.size().width() == artwork.OUTPUT_SIZE
+            assert image.size().height() == artwork.OUTPUT_SIZE
 
     def test_an_installed_emblem_becomes_selectable(
         self, tmp_path: Path, emblem_home: Path
@@ -264,7 +256,8 @@ class TestInstalling:
 
     def test_a_vector_can_be_installed(self, tmp_path: Path, emblem_home: Path) -> None:
         artwork.install(vector(tmp_path / "a.svg"), "vector-hat")
-        assert (emblem_home / "vector-hat" / "ready" / "64.png").exists()
+        assert (emblem_home / "vector-hat.png").exists()
+        assert (emblem_home / "vector-hat" / "ready.png").exists()
 
     def test_an_unnamed_emblem_is_refused(self, tmp_path: Path, emblem_home: Path) -> None:
         with pytest.raises(artwork.UnsupportedArtworkError):
@@ -276,14 +269,75 @@ class TestInstalling:
         artwork.install(disc(tmp_path / "red.png", fill=RED), "hat")
         artwork.install(disc(tmp_path / "blue.png", fill="#3B7DD8"), "hat")
 
-        ready = QImage(str(emblem_home / "hat" / "ready" / "64.png"))
-        assert ready.pixelColor(32, 20).name() == QColor("#3B7DD8").name()
+        ready = QImage(str(emblem_home / "hat" / "ready.png"))
+        assert ready.pixelColor(128, 80).name() == QColor("#3B7DD8").name()
         assert artwork.user_emblems() == ["hat"]
 
-    def test_the_break_tone_is_honoured(self, tmp_path: Path, emblem_home: Path) -> None:
-        artwork.install(disc(tmp_path / "a.png"), "pale", artwork.SilhouetteTone.LIGHT)
-        image = QImage(str(emblem_home / "pale" / "break" / "64.png"))
-        assert image.pixelColor(32, 32).name() == QColor("#EDEDED").name()
+
+class TestDroppedPNGs:
+    def test_a_png_dropped_at_the_root_is_generated(self, emblem_home: Path) -> None:
+        disc(emblem_home / "Hunter x Hunter.png")
+
+        assert artwork.sync_dropins() == ["hunter-x-hunter"]
+        for state in IconState:
+            assert (emblem_home / "hunter-x-hunter" / f"{state.value}.png").is_file()
+
+    @pytest.mark.parametrize(
+        ("title", "folder"),
+        [("Hunter x Hunter", "hunter-x-hunter"), ("僕のヒーロー", "僕のヒーロー")],
+    )
+    def test_a_matching_drop_in_overrides_the_generated_monogram(
+        self, emblem_home: Path, qapp: object, title: str, folder: str
+    ) -> None:
+        disc(emblem_home / f"{title}.png")
+        artwork.sync_dropins()
+
+        shown = emblems.icon_for("monogram", IconState.READY, title)
+        expected = QIcon(str(emblem_home / folder / "ready.png"))
+
+        assert bytes(shown.pixmap(22, 22).toImage().constBits()) == bytes(
+            expected.pixmap(22, 22).toImage().constBits()
+        )
+
+    def test_an_unchanged_drop_in_is_not_rendered_again(self, emblem_home: Path) -> None:
+        disc(emblem_home / "a.png")
+        artwork.sync_dropins()
+        target = emblem_home / "a" / "ready.png"
+        written = target.stat().st_mtime_ns
+
+        assert artwork.sync_dropins() == []
+        assert target.stat().st_mtime_ns == written
+
+    def test_changing_the_source_regenerates_the_states(self, emblem_home: Path) -> None:
+        source = disc(emblem_home / "a.png", fill=RED)
+        artwork.sync_dropins()
+        before = QImage(str(emblem_home / "a" / "ready.png")).pixelColor(128, 80)
+
+        disc(source, fill="#3B7DD8")
+        assert artwork.sync_dropins() == ["a"]
+        after = QImage(str(emblem_home / "a" / "ready.png")).pixelColor(128, 80)
+
+        assert before != after
+
+    def test_a_broken_drop_in_is_logged_and_skipped(
+        self, emblem_home: Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        (emblem_home / "broken.png").write_bytes(b"not an image")
+
+        assert artwork.sync_dropins() == []
+        assert not (emblem_home / "broken").exists()
+        assert "could not generate emblem" in caplog.text
+
+    def test_a_broken_replacement_keeps_the_last_working_states(self, emblem_home: Path) -> None:
+        source = disc(emblem_home / "a.png")
+        artwork.sync_dropins()
+        target = emblem_home / "a" / "ready.png"
+        working = target.read_bytes()
+
+        source.write_bytes(b"not an image")
+
+        assert artwork.sync_dropins() == []
+        assert target.read_bytes() == working
 
 
 class TestUninstalling:
@@ -292,6 +346,7 @@ class TestUninstalling:
         assert artwork.uninstall("hat") is True
         assert artwork.user_emblems() == []
         assert not (emblem_home / "hat").exists()
+        assert not (emblem_home / "hat.png").exists()
 
     def test_dropping_something_that_was_never_there_is_harmless(self, emblem_home: Path) -> None:
         assert artwork.uninstall("nothing") is False

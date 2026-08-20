@@ -29,7 +29,7 @@ repos:
         entry: uv run python tools/gen_icons.py --check
         language: system
         pass_filenames: false
-        files: ^(tools/gen_icons.py|src/mangame/assets/emblems/|docs/icon-(reference.png|pixels.json))
+        files: ^(artwork/|tools/gen_icons.py|src/mangame/assets/emblems/)
 
       - id: release-metadata
         name: release metadata agreement

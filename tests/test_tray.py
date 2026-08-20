@@ -10,7 +10,7 @@ from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
-from PySide6.QtGui import QIcon
+from PySide6.QtGui import QColor, QIcon, QImage
 from PySide6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
 
 from mangame.domain.models import IconState
@@ -92,6 +92,19 @@ class TestOneIconPerManga:
         for series in SERIES:
             shown = pixels(tray._icons[series.key].icon())
             assert shown == pixels(icon_for(series.emblem, IconState.DUE, series.title))
+
+    def test_dropping_a_png_named_for_a_series_replaces_its_icon(self, tray: MangameTray) -> None:
+        rebuild(tray, single_tray_icon=False)
+        source = QImage(64, 64, QImage.Format.Format_ARGB32)
+        source.fill(QColor("#E8352C"))
+        source.save(str(paths.user_emblem_dir() / "Berserk.png"))
+
+        before = pixels(tray._icons["berserk"].icon())
+        tray.refresh()
+        after = pixels(tray._icons["berserk"].icon())
+
+        assert after != before
+        assert after == pixels(QIcon(str(paths.user_emblem_dir() / "berserk" / "due.png")))
 
     def test_switching_modes_clears_up_after_itself(self, tray: MangameTray) -> None:
         # Both directions: a stale icon left behind is a duplicate in the panel.

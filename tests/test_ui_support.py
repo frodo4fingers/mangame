@@ -6,7 +6,7 @@ from statistics import mean, median
 from typing import ClassVar
 
 import pytest
-from PySide6.QtCore import QPoint, QRect
+from PySide6.QtCore import QPoint, QRect, Qt
 from PySide6.QtGui import QColor, QImage
 
 from mangame.domain.models import IconState
@@ -99,11 +99,10 @@ class TestEmblems:
         assert found.is_dir() or found.is_file()
 
     @pytest.mark.parametrize("emblem", BUNDLED)
-    def test_bundled_artwork_covers_the_sizes_a_panel_may_ask_for(self, emblem: str) -> None:
+    def test_each_state_is_one_scalable_image(self, emblem: str) -> None:
         for state in IconState:
-            directory = emblems.BUNDLED_DIR / emblem / state.value
-            present = {int(p.stem) for p in directory.glob("*.png") if p.stem.isdigit()}
-            assert set(emblems.SIZES) <= present
+            image = QImage(str(emblems.BUNDLED_DIR / emblem / f"{state.value}.png"))
+            assert image.width() == image.height() == 256
 
     def test_user_artwork_takes_priority_over_bundled(self, tmp_path: Path) -> None:
         assert emblems.emblem_roots()[0] != emblems.BUNDLED_DIR
@@ -128,7 +127,12 @@ class TestAppMark:
 
     @staticmethod
     def _pixels(emblem: str, state: IconState, size: int = 22) -> list[QColor]:
-        image = QImage(str(emblems.BUNDLED_DIR / emblem / state.value / f"{size}.png"))
+        image = QImage(str(emblems.BUNDLED_DIR / emblem / f"{state.value}.png")).scaled(
+            size,
+            size,
+            Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.SmoothTransformation,
+        )
         found = [
             image.pixelColor(x, y)
             for y in range(image.height())
@@ -178,9 +182,9 @@ class TestAppMark:
         assert lightest > 0.7
 
     def test_it_is_not_the_same_picture_as_a_series_emblem(self) -> None:
-        mark = QImage(str(emblems.BUNDLED_DIR / "mangame" / "ready" / "64.png"))
+        mark = QImage(str(emblems.BUNDLED_DIR / "mangame" / "ready.png"))
         for other in self.SERIES:
-            assert mark != QImage(str(emblems.BUNDLED_DIR / other / "ready" / "64.png"))
+            assert mark != QImage(str(emblems.BUNDLED_DIR / other / "ready.png"))
 
 
 class TestMonogramFallback:

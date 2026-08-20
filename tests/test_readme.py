@@ -47,15 +47,11 @@ class TestPaths:
 
 
 class TestArtwork:
-    def test_the_documented_icon_sizes_are_the_ones_rendered(self) -> None:
-        # The drop-in path is spelt as emblems/<name>/<state>/<16|18|...>.png,
-        # which is a promise about what a hand-made emblem has to contain.
-        written = re.search(r"<((?:\d+\|)+\d+)>\.png", TEXT)
-        assert written is not None, "the drop-in path is no longer documented"
-        assert tuple(int(n) for n in written.group(1).split("|")) == emblems.SIZES
+    def test_a_drop_in_is_documented_as_one_source_png(self) -> None:
+        assert "emblems/<manga>.png" in TEXT
 
     def test_the_documented_states_are_the_ones_derived(self) -> None:
-        written = re.search(r"<((?:\w+\|)+\w+)>/<", TEXT)
+        written = re.search(r"<((?:\w+\|)+\w+)>\.png", TEXT)
         assert written is not None
         assert set(written.group(1).split("|")) == {s.value for s in IconState}
 

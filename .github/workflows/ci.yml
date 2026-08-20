@@ -118,7 +118,7 @@ jobs:
           assert bundled.is_dir(), f"no emblem directory at {bundled}"
           shipped = {d.name for d in bundled.iterdir() if d.is_dir()}
           assert {"mangame", "onepiece", "book"} <= shipped, shipped
-          assert (bundled / "mangame" / "ready" / "22.png").is_file()
+          assert (bundled / "mangame" / "ready.png").is_file()
           assert paths.config_dir() == Path("/tmp/smoke-home")
           print("shipped emblems:", sorted(shipped))
           PY

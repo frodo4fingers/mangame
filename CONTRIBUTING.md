@@ -24,8 +24,8 @@ uv run mangame
 ```
 
 The full pre-commit run includes gitleaks in Docker, so Docker must be
-available. Inkscape and ImageMagick are needed only when regenerating bundled
-artwork.
+available. Artwork generation uses Pillow from the normal development
+environment and needs no external renderer.
 
 Dependabot updates Python and GitHub Actions dependencies. `renovate.json5`
 covers pre-commit hook revisions, which Dependabot does not manage; enable the
@@ -95,21 +95,22 @@ new adapter.
 
 ## Artwork
 
-Bundled emblems are generated, never hand-edited:
+Add one original PNG to `artwork/`; the generated ready, due and break files
+are never hand-edited:
 
 ```bash
+uv run python tools/gen_icons.py [emblem]
 uv run python tools/gen_icons.py --check
-uv run python tools/gen_icons.py [emblem]   # tray sizes, needs inkscape + convert
 uv run python tools/gen_app_icon.py         # the .ico/.icns for installers
 ```
 
-A new emblem needs all three states to read correctly at 16px. `TestEmblems`
-and `TestAppMark` in `tests/test_ui_support.py` measure that statistically
-rather than trusting the eye — a thin shape can look fine and still fail to
-read as a silhouette.
+The normal development environment is sufficient; no external renderer is
+needed. A new emblem still needs all three generated states to read correctly
+at 16px. `TestEmblems` and `TestAppMark` in `tests/test_ui_support.py` measure
+that statistically rather than trusting the eye.
 
 Read [docs/ARTWORK.md](docs/ARTWORK.md) before proposing bundled artwork. It
-defines the approved pixel reference and the original-work requirement.
+defines the one-PNG workflow and the original-work requirement.
 
 ## Releasing
 

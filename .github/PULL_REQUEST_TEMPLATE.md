@@ -15,5 +15,5 @@
 - [ ] `CHANGELOG.md` is updated when users need to know about the change.
 - [ ] The full gate from `CONTRIBUTING.md` passes.
 - [ ] UI or artwork changes include before/after images.
-- [ ] Artwork changes pass `uv run python tools/gen_icons.py --check` and update
-      `docs/icon-reference.png` intentionally.
+- [ ] Artwork changes add or update one source PNG and pass
+      `uv run python tools/gen_icons.py --check`.

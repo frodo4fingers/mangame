@@ -37,6 +37,7 @@ from mangame.sources.base import SourceMatch
 from mangame.store import config
 from mangame.store.config import SeriesConfig, Settings, series_key
 from mangame.store.db import Database
+from mangame.ui import artwork
 from mangame.ui.add_dialog import AddSeriesDialog, SeriesCandidate
 from mangame.ui.emblems import icon_for
 from mangame.ui.menu import TrayMenu, menu_anchor
@@ -133,6 +134,7 @@ class MangameTray(QObject):
 
     def refresh(self) -> None:
         """Recompute every snapshot and reconcile the tray icons with it."""
+        artwork.sync_dropins()
         now = datetime.now(UTC)
         snapshots = {s.key: s for s in self._library.snapshots(now)}
         visible = [c for c in self._settings.tray_series() if c.key in snapshots]

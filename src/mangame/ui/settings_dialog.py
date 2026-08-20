@@ -507,15 +507,6 @@ class SettingsDialog(QDialog):
         # be mistaken for the user having named the emblem themselves.
         self._name.textEdited.connect(self._on_name_typed)
 
-        self._tone = QComboBox(page)
-        self._tone.addItem(
-            self._t("dialog.settings.art.tone.dark"), artwork.SilhouetteTone.DARK.value
-        )
-        self._tone.addItem(
-            self._t("dialog.settings.art.tone.light"), artwork.SilhouetteTone.LIGHT.value
-        )
-        self._tone.currentIndexChanged.connect(self.update_preview)
-
         self._previews: dict[IconState, QLabel] = {}
         # The preview and its heading live in one box so the whole block can
         # be hidden until there is a picture: captions under empty squares
@@ -576,7 +567,6 @@ class SettingsDialog(QDialog):
         form.addRow("", self._verdict)
         self._name_row = form.rowCount()
         form.addRow(self._t("dialog.settings.art.name"), self._name)
-        form.addRow(self._t("dialog.settings.art.tone"), self._tone)
         # Only a shared emblem needs naming; for a manga the key is the name.
         form.setRowVisible(self._name_row, False)
         self._form = form
@@ -690,7 +680,11 @@ class SettingsDialog(QDialog):
         self._installed.setEnabled(bool(installed))
         self._discard.setEnabled(False)
         for name in installed:
-            worn_by = [s.title for s in self._settings.series if s.emblem == name]
+            worn_by = [
+                s.title
+                for s in self._settings.series
+                if s.emblem == name or artwork.emblem_name(s.title) == name
+            ]
             wearer = ", ".join(worn_by) if worn_by else self._t("dialog.settings.art.unused")
             item = QListWidgetItem(f"{name} — {wearer}")
             item.setData(Qt.ItemDataRole.UserRole, name)
@@ -701,9 +695,6 @@ class SettingsDialog(QDialog):
         self.update_preview()
 
     # -------------------------------------------------------------- artwork
-
-    def tone(self) -> artwork.SilhouetteTone:
-        return artwork.SilhouetteTone(self._tone.currentData())
 
     def source(self) -> Path | None:
         return self._source
@@ -802,7 +793,7 @@ class SettingsDialog(QDialog):
                 swatch.clear()
                 continue
             try:
-                image = artwork.state_image(self._source, state_key, 64, self.tone())
+                image = artwork.state_image(self._source, state_key, 64)
             except artwork.UnsupportedArtworkError:
                 swatch.clear()
                 self._status.setText(self._t("dialog.settings.art.failed"))
@@ -841,8 +832,8 @@ class SettingsDialog(QDialog):
         if not raw.strip():
             return
         try:
-            name = artwork.install(self._source, raw, self.tone())
-        except artwork.UnsupportedArtworkError:
+            name = artwork.install(self._source, raw)
+        except (OSError, artwork.UnsupportedArtworkError):
             self._status.setText(self._t("dialog.settings.art.failed"))
             return
 

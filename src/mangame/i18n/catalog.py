@@ -77,9 +77,6 @@ _EN: Final[dict[str, str]] = {
         "“{name}” matches none of your manga. Pick one above, or save it as a shared emblem."
     ),
     "dialog.settings.art.verdict.shared": "Saved under a name any manga can wear.",
-    "dialog.settings.art.tone": "Break style",
-    "dialog.settings.art.tone.dark": "Dark silhouette, light rim",
-    "dialog.settings.art.tone.light": "Light silhouette, dark rim",
     "dialog.settings.art.preview": "Preview on a light and a dark panel",
     "dialog.settings.art.prompt": "Pick a PNG or SVG to turn into a tray emblem",
     "dialog.settings.art.import": "Add emblem",
@@ -166,9 +163,6 @@ _CATALOGS: Final[dict[str, dict[str, str]]] = {
         "dialog.settings.art.verdict.shared": (
             "Wird unter einem Namen gesichert, den jeder Manga tragen kann."
         ),
-        "dialog.settings.art.tone": "Pausen-Darstellung",
-        "dialog.settings.art.tone.dark": "Dunkle Silhouette, heller Rand",
-        "dialog.settings.art.tone.light": "Helle Silhouette, dunkler Rand",
         "dialog.settings.art.preview": "Vorschau auf hellem und dunklem Panel",
         "dialog.settings.art.prompt": "PNG oder SVG wählen, das zur Bildmarke werden soll",
         "dialog.settings.art.import": "Bildmarke anlegen",
@@ -251,9 +245,6 @@ _CATALOGS: Final[dict[str, dict[str, str]]] = {
         "dialog.settings.art.verdict.shared": (
             "Se guarda con un nombre que cualquier manga puede llevar."
         ),
-        "dialog.settings.art.tone": "Estilo en pausa",
-        "dialog.settings.art.tone.dark": "Silueta oscura, borde claro",
-        "dialog.settings.art.tone.light": "Silueta clara, borde oscuro",
         "dialog.settings.art.preview": "Vista previa sobre panel claro y oscuro",
         "dialog.settings.art.prompt": "Elige un PNG o SVG para convertirlo en emblema",
         "dialog.settings.art.import": "Crear emblema",

@@ -186,27 +186,25 @@ Two properties matter more than the exact numbers:
 
 ## 6. Three states from one picture
 
-`ui/artwork.py`. Bundled emblems are drawn three times from three palettes;
-anything a user imports is one picture, so *due* and *break* have to be derived.
+`ui/artwork.py`. Every emblem begins as one source PNG. The repository keeps
+bundled sources in `artwork/`; users can place a title-named PNG directly in
+their emblem directory or import one through Settings. In both cases the same
+transform derives *ready*, *due* and *break*.
 
-- **Greyscale** leans on Qt's `Grayscale8` conversion, which is a gamma-correct
-  Rec. 709 luminance — it linearises, weights, then re-encodes — and then
-  remaps the result into a mid band (0.34–0.86). Plain luminance would be
-  honest and useless: dark artwork would come out almost black, which is
-  exactly what *break* looks like, and at 16 pixels there is no detail left to
-  distinguish them by. The band is what guarantees the states are told apart.
+- **Ready** is the source, scaled into a transparent 256px square without
+  changing its proportions.
+- **Greyscale** uses luminance and remaps it into a mid band (0.34–0.86).
+  Plain luminance would render dark artwork almost black, which is exactly what
+  *break* looks like at tray size. The band keeps those meanings distinct.
 - **Silhouette** flattens everything opaque to one tone and rings it in the
-  opposite one, matching the palettes `tools/gen_icons.py` uses. A dark
-  silhouette vanishes on a dark panel and a light one vanishes on a light
-  panel, so the rim is what makes either choice survive the other background.
-  It is grown by stamping the alpha mask across a disc of offsets and punching
-  the original shape back out — draw calls rather than a pixel loop — and the
-  artwork is inset by exactly the rim width so the halo is never clipped.
+  opposite one. The fixed near-black body and near-white rim survive both
+  light and dark panels. The rim is grown from the alpha mask and the source
+  is inset by its width so the halo is never clipped.
 
 Everything works on `QImage`, which needs no display, no `QApplication` and no
-window system. That is what keeps the live preview cheap (a full 12-size,
-3-state import takes under 200 ms) and lets the pixel assertions in
-`tests/test_artwork.py` be the real thing.
+window system. The generator stores one 256px file per state; Qt scales it to
+the panel's requested size. A small source marker records the filename, size
+and modification time so normal tray refreshes skip rendering unchanged files.
 
 Missing artwork falls back to the **monogram**, never to another emblem. A
 generated badge still says which series it is; a shared stand-in would make
@@ -222,20 +220,9 @@ which rules out every object and leaves a monogram.
 
 Not the *generated* monogram, though: that one takes its letter and its hue
 from a series title, and this icon stands for all of them. So the M is bundled
-artwork like the hat and the book, drawn by `tools/gen_icons.py` in the same
-three palettes, and `Settings.tray_emblem` may point at any installed emblem
+artwork like the hat and the book, generated from its source PNG by
+`tools/gen_icons.py`. `Settings.tray_emblem` may point at any installed emblem
 instead — including imported artwork.
-
-Two details are load-bearing, and both were found by measuring rather than by
-looking:
-
-- **The stems are fat.** A letter has far less area per unit of outline than a
-  hat or a book. Drawn at the family's proportions the *break* state — a dark
-  body with a light rim — came out only 39% dark pixels against 59% and 66%
-  for the other two: an outline drawing, not a silhouette.
-- **`paint-order="stroke fill"`** puts the outline behind the fill, so only its
-  outer half shows and the body stays solid. The stroke is doubled to 6 to
-  keep the *visible* rim the same width as everywhere else.
 
 `TestAppMark` in `tests/test_ui_support.py` pins this by comparing the mark's
 median lightness and mean saturation against the series artwork, so the
@@ -409,11 +396,10 @@ opened at all.
 Measured on the real app, same config, same age: **96.2 MB → 85.4 MB**, and
 ~160 ms off time-to-visible-tray.
 
-**Not changed, having measured it:** the icon path. `QIcon.addFile` already
-records a filename and rasterises on demand, so listing twelve sizes costs
-~11 kB per icon, not twelve bitmaps. The procedural monogram *is* rendered
-eagerly at four sizes, but that is deliberate — text drawn at the target size
-beats text scaled to it, and the whole cache is a fraction of one pool.
+The icon path is also lazy: each stored 256px state is decoded and scaled by
+Qt only when requested. The procedural monogram is rendered eagerly at four
+sizes because text drawn at the target size beats text scaled to it; the whole
+cache remains a fraction of one HTTP pool.
 
 ## 8. Shipping it
 

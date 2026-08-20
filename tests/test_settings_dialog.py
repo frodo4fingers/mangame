@@ -540,19 +540,6 @@ class TestArtworkTab:
         for state in IconState:
             assert not dialog._previews[state].pixmap().isNull()
 
-    def test_switching_tone_redraws_the_break_preview(
-        self, dialog: SettingsDialog, tmp_path: Path
-    ) -> None:
-        dialog.set_source(picture(tmp_path / "a.png"))
-
-        def break_body() -> str:
-            swatch = dialog._previews[IconState.BREAK].pixmap().toImage()
-            return swatch.pixelColor(swatch.width() // 4, swatch.height() // 2).name()
-
-        dark = break_body()
-        dialog._tone.setCurrentIndex(dialog._tone.findData(artwork.SilhouetteTone.LIGHT.value))
-        assert QColor(break_body()).lightness() > QColor(dark).lightness()
-
     def test_an_unreadable_file_says_so_instead_of_importing_it(
         self, dialog: SettingsDialog, tmp_path: Path
     ) -> None:
@@ -577,8 +564,9 @@ class TestArtworkTab:
         dialog.set_source(picture(tmp_path / "One Piece.png"))
         dialog._import.click()
 
-        assert (emblem_home / "one-piece" / "ready" / "64.png").exists()
-        assert (emblem_home / "one-piece" / "break" / "64.png").exists()
+        assert (emblem_home / "one-piece.png").exists()
+        assert (emblem_home / "one-piece" / "ready.png").exists()
+        assert (emblem_home / "one-piece" / "break.png").exists()
         assert len(drawn.calls) == 1
         assert isinstance(saved.last, Settings)
         assert saved.last.series[0].emblem == "one-piece"
@@ -594,7 +582,8 @@ class TestArtworkTab:
         dialog._target.setCurrentIndex(dialog._target.findData(SHARED_EMBLEM))
         dialog._import.click()
 
-        assert (emblem_home / "straw-hat" / "ready" / "64.png").exists()
+        assert (emblem_home / "straw-hat.png").exists()
+        assert (emblem_home / "straw-hat" / "ready.png").exists()
         assert saved.calls == []
 
     def test_an_imported_emblem_can_be_picked_straight_away(
@@ -626,6 +615,15 @@ class TestArtworkTab:
 
         listed = {dialog._installed.item(i).text() for i in range(dialog._installed.count())}
         assert "one-piece — One Piece" in listed
+
+    def test_the_list_recognises_title_named_drop_ins(
+        self, dialog: SettingsDialog, emblem_home: Path
+    ) -> None:
+        picture(emblem_home / "One Piece.png")
+
+        dialog.refresh_artwork()
+
+        assert dialog._installed.item(0).text() == "one-piece — One Piece"
 
     def test_an_imported_emblem_can_be_removed_again(
         self, dialog: SettingsDialog, tmp_path: Path, emblem_home: Path

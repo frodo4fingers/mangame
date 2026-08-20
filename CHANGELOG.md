@@ -13,8 +13,10 @@ uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 - A stream-free packaged smoke test that cannot hang a release indefinitely.
 - Contributor-facing pull request, conduct, support, roadmap and artwork
   guidance.
-- An approved icon contact sheet and generated-artwork contract that catches
-  stale SVGs, missing sizes and unreviewed pixel changes.
+- A one-PNG artwork workflow: drop a title-named image into the emblem
+  directory and mangame derives the ready, due and break states automatically.
+- Bundled artwork uses the same source-PNG generator and stores one 256px image
+  per state instead of a twelve-resolution ladder.
 - Release metadata agreement checks, dependency notices and SHA-256 checksums.
 - Python 3.14 CI coverage and immutable current GitHub Action revisions.
 - `MANGAME_HOME` puts settings, database, logs and artwork in one directory of your

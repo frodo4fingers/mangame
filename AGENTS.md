@@ -83,7 +83,7 @@ installed, or its shell rules silently do not run.
 | `src/mangame/diagnostics.py` | Rotating logs and the copyable support report | Must work without stdout/stderr |
 | `src/mangame/ui/` | Tray, menus, dialogs, notifications, emblem rendering | Qt only here |
 | `src/mangame/i18n/` | Translation catalogue, language codes | en, de, es |
-| `tools/` | Artwork generators | Need `inkscape` and ImageMagick `convert` |
+| `tools/` | Artwork generators | Pillow only; source PNGs live in `artwork/` |
 | `packaging/` | PyInstaller spec, icons, desktop entry | |
 
 ## Conventions
@@ -120,17 +120,17 @@ Each of these cost real debugging time. They are all still reachable.
 ## Artwork
 
 ```bash
-uv run python tools/gen_icons.py [emblem]   # tray sizes for one or all emblems
+uv run python tools/gen_icons.py [emblem]   # three states from one source PNG
 uv run python tools/gen_app_icon.py         # the .ico/.icns for installers
-uv run python tools/gen_icons.py --check    # no renderer; checks the approved pixels
+uv run python tools/gen_icons.py --check    # compare outputs with their sources
 ```
 
 A new emblem must read correctly at 16px in all three states.
 `TestEmblems` and `TestAppMark` in `tests/test_ui_support.py` measure that
 statistically, because a thin shape can look fine to the eye and still fail to
 read as a silhouette. Judge artwork by those measurements, and fix the drawing
-rather than the threshold. `docs/ARTWORK.md` is the visual contribution
-contract.
+rather than the threshold. Generated files are one 256px PNG per state; Qt
+scales them for the panel. `docs/ARTWORK.md` is the contribution contract.
 
 ## Working notes
 

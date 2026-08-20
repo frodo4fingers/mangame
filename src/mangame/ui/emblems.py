@@ -2,10 +2,10 @@
 
 Two mechanisms, in order:
 
-1. **Bundled or user-supplied artwork.** ``<emblems>/<name>/<state>/<size>.png``.
-   The user directory is searched first, so anyone can drop in their own hat
-   without rebuilding the app — see :mod:`mangame.ui.artwork` for the importer
-   that writes that layout.
+1. **Bundled or user-supplied artwork.** ``<emblems>/<name>/<state>.png``.
+   The user directory is searched first. A root-level ``<title>.png`` is
+   transformed into that layout automatically; the old per-size layout
+   remains readable for existing installations.
 2. **Procedural monogram.** Any series without artwork gets a generated badge:
    the initial on a colour derived from the title. This means every series has
    a distinct, recognisable icon from the moment it is added, and it sidesteps
@@ -32,10 +32,6 @@ from mangame.store import paths
 
 BUNDLED_DIR = Path(__file__).resolve().parent.parent / "assets" / "emblems"
 
-#: Sizes rasterised by ``tools/gen_icons.py``; a QIcon gets all of them so the
-#: platform can pick the right one for the panel and DPI.
-SIZES = (16, 18, 20, 22, 24, 32, 36, 44, 48, 64, 128, 256)
-
 #: Not a directory but a request: draw the badge instead of loading a picture.
 MONOGRAM_EMBLEM = "monogram"
 
@@ -46,6 +42,12 @@ _MONOGRAM_STYLE: dict[IconState, tuple[float, float, str, str]] = {
     IconState.DUE: (0.0, 0.66, "#FFFFFF", "#00000055"),
     IconState.BREAK: (0.0, 0.14, "#8C8C8C", "#D2D2D2D9"),
 }
+
+
+def emblem_name(raw: str) -> str:
+    """Fold a title or user name into something usable as a directory name."""
+    cleaned = "".join(char if char.isalnum() else "-" for char in raw.strip().lower())
+    return "-".join(part for part in cleaned.split("-") if part)
 
 
 def emblem_roots() -> tuple[Path, ...]:
@@ -70,10 +72,30 @@ def selectable_emblems() -> list[str]:
 
 def _find(emblem: str, state: IconState) -> Path | None:
     for root in emblem_roots():
-        candidate = root / emblem / state.value
-        if candidate.is_dir():
-            return candidate
+        state_file = root / emblem / f"{state.value}.png"
+        if state_file.is_file():
+            return state_file
+        legacy_directory = root / emblem / state.value
+        if legacy_directory.is_dir():
+            return legacy_directory
     return None
+
+
+def _user_title_artwork(title: str, state: IconState) -> Path | None:
+    """A dropped ``<title>.png`` intentionally overrides configured artwork."""
+    name = emblem_name(title)
+    state_file = paths.user_emblem_dir() / name / f"{state.value}.png"
+    return state_file if state_file.is_file() else None
+
+
+def _icon(path: Path) -> QIcon:
+    if path.is_file():
+        return QIcon(str(path))
+    icon = QIcon()
+    candidates = [candidate for candidate in path.glob("*.png") if candidate.stem.isdigit()]
+    for candidate in sorted(candidates, key=lambda item: int(item.stem)):
+        icon.addFile(str(candidate))
+    return icon
 
 
 def _hue_for(seed: str) -> int:
@@ -125,14 +147,16 @@ def icon_for(emblem: str, state: IconState, title: str) -> QIcon:
     answer only depends on the three arguments. :func:`forget_artwork` drops
     the cache after artwork is imported or removed.
     """
+    dropped = _user_title_artwork(title, state)
+    if dropped is not None:
+        icon = _icon(dropped)
+        if not icon.isNull():
+            return icon
+
     if emblem != MONOGRAM_EMBLEM:
-        directory = _find(emblem, state)
-        if directory is not None:
-            icon = QIcon()
-            for size in SIZES:
-                candidate = directory / f"{size}.png"
-                if candidate.exists():
-                    icon.addFile(str(candidate))
+        found = _find(emblem, state)
+        if found is not None:
+            icon = _icon(found)
             if not icon.isNull():
                 return icon
 
