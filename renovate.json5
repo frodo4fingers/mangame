@@ -1,0 +1,8 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "enabledManagers": ["pre-commit"],
+  "labels": ["dependencies"],
+  "schedule": ["before 6am on monday"],
+  "prConcurrentLimit": 1,
+}

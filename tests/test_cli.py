@@ -1,10 +1,13 @@
-"""The command line. Two flags, but they are the ones a bug report needs."""
+"""The command line, including the stream-free path used by packaged builds."""
 
 import importlib.metadata
+import sys
 import tomllib
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
+from PySide6.QtWidgets import QApplication
 
 from mangame import __main__, __version__
 from mangame.store import paths
@@ -42,6 +45,14 @@ class TestVersion:
         assert "version" not in project
         assert "version" in project["dynamic"]
 
+    def test_a_windowed_build_without_stdout_does_not_crash(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr("sys.argv", ["mangame", "--version"])
+        monkeypatch.setattr(sys, "stdout", None)
+
+        assert __main__.main() == 0
+
 
 class TestHelp:
     def test_it_explains_itself_and_stops(
@@ -71,3 +82,45 @@ class TestHelp:
         }
 
         assert offered == {"--version", "--help"}
+
+    def test_a_windowed_build_without_stdout_does_not_crash(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr("sys.argv", ["mangame", "--help"])
+        monkeypatch.setattr(sys, "stdout", None)
+
+        assert __main__.main() == 0
+
+
+class TestPackagedEntry:
+    def test_the_smoke_path_exercises_storage_and_bundled_artwork(
+        self,
+        qapp: QApplication,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setenv(paths.HOME_VAR, str(tmp_path))
+
+        assert __main__._smoke_test(qapp) == 0
+        assert paths.database_file().is_file()
+
+    def test_no_tray_is_reported_without_assuming_stderr_exists(
+        self,
+        qapp: QApplication,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setattr("sys.argv", ["mangame"])
+        monkeypatch.setattr(sys, "stderr", None)
+        monkeypatch.setattr("mangame.__main__.env.load", lambda: None)
+        monkeypatch.setattr(
+            "mangame.__main__.diagnostics.configure_logging",
+            lambda: tmp_path / "log",
+        )
+        monkeypatch.setattr(__main__, "_application", lambda: qapp)
+
+        with patch(
+            "mangame.__main__.QSystemTrayIcon.isSystemTrayAvailable",
+            return_value=False,
+        ):
+            assert __main__.main() == 1

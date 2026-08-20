@@ -28,6 +28,8 @@ or the menu bar, whichever your desktop calls it.
 
 No Python, no toolchain — grab the file for your platform from the
 [releases page](https://github.com/frodo4fingers/mangame/releases) and run it.
+If the first public release has not been published yet, use
+[Run from source](#run-from-source).
 
 | Platform | File | Then |
 | --- | --- | --- |
@@ -87,7 +89,7 @@ which keeps the menu to one flat list that cannot run off the edge of a screen.
 
 ## Settings
 
-**Settings…** opens one window with three tabs:
+**Settings…** opens one window with four tabs:
 
 - **General** — the reading language, whether the panel shows one icon for the
   whole library (and which emblem it wears) or one per manga, new-chapter
@@ -97,6 +99,8 @@ which keeps the menu to one flat list that cannot run off the edge of a screen.
   wears, and adding or dropping a series.
 - **Artwork** — turn any picture into an emblem; see [Your own
   artwork](#your-own-artwork).
+- **Diagnostics** — copy the version, runtime, platform and local support-file
+  paths for a bug report.
 
 Changes take effect as you make them. Choosing a different reading language
 re-opens the window in that language, because it is the menu language too.
@@ -185,13 +189,14 @@ Resolved by `platformdirs`, so they land wherever your OS expects:
 | Settings | `~/.config/mangame/config.json` | `%APPDATA%\mangame\config.json` | `~/Library/Application Support/mangame/config.json` |
 | Database | `~/.local/share/mangame/state.sqlite3` | `%APPDATA%\mangame\state.sqlite3` | `~/Library/Application Support/mangame/state.sqlite3` |
 | Your own artwork | `~/.local/share/mangame/emblems/` | `%APPDATA%\mangame\emblems\` | `~/Library/Application Support/mangame/emblems/` |
+| Logs | `~/.local/state/mangame/log/mangame.log` | `%APPDATA%\mangame\Logs\mangame.log` | `~/Library/Logs/mangame/mangame.log` |
 
-On Linux the `XDG_CONFIG_HOME` and `XDG_DATA_HOME` variables are honoured if
-you set them.
+On Linux the `XDG_CONFIG_HOME`, `XDG_DATA_HOME` and `XDG_STATE_HOME` variables
+are honoured if you set them.
 
-Set `MANGAME_HOME` to put settings, database and artwork in one directory of
-your choosing instead — for a portable copy on a USB stick, or to run a second
-instance without disturbing the first. It works the same on all three
+Set `MANGAME_HOME` to put settings, database, logs and artwork in one directory
+of your choosing instead — for a portable copy on a USB stick, or to run a
+second instance without disturbing the first. It works the same on all three
 platforms:
 
 ```bash
@@ -208,7 +213,7 @@ keep them:
 
 | Variable | What it does |
 | --- | --- |
-| `MANGAME_HOME` | Settings, database and artwork all in this one directory. |
+| `MANGAME_HOME` | Settings, database, logs and artwork all in this one directory. |
 | `MANGAME_EMBLEM_DIR` | Imported artwork here, wherever the rest lives. |
 | `MANGAME_ENV_FILE` | Read those from this file instead of a `.env`. |
 
@@ -337,7 +342,9 @@ uv sync --extra dev
 uv run pytest                                   # no network, no display
 uv run ruff format .
 uv run ruff check .
-uv run mypy src tests tools                     # also --platform win32 / darwin
+uv run mypy --platform linux src tests tools
+uv run mypy --platform win32 src tests tools
+uv run mypy --platform darwin src tests tools
 uv run pre-commit install
 ```
 
@@ -351,9 +358,13 @@ draws each emblem in three palettes and rasterises every tray size; it needs
 shape or a palette, optionally naming one emblem:
 
 ```bash
+uv run python tools/gen_icons.py --check   # no renderer needed
 uv run python tools/gen_icons.py           # all of them
 uv run python tools/gen_icons.py mangame   # just the M
 ```
+
+The approved small-size comparison and contribution rules are in
+[`docs/ARTWORK.md`](docs/ARTWORK.md).
 
 The installer icons in `packaging/icons/` come from the same drawing, rendered
 larger and packed into the containers Windows and macOS require:
@@ -377,14 +388,19 @@ users download.
 ### Continuous integration
 
 `.github/workflows/ci.yml` runs the tests on Linux, Windows and macOS against
-Python 3.12 and 3.13, plus formatting, linting, type-checking for all three
-target platforms, the pre-commit hooks, and a check that an installed wheel
-can still find its artwork. `.github/workflows/release.yml` builds the
-executables and publishes them when a `v*` tag is pushed.
+Python 3.12, 3.13 and 3.14, plus formatting, linting, type-checking for all
+three target platforms, the pre-commit hooks, and checks that generated artwork
+is approved and an installed wheel can still find it.
+`.github/workflows/release.yml` builds the executables and publishes them when
+a `v*` tag is pushed.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the full loop, and
 [AGENTS.md](AGENTS.md) if you are working with an AI coding agent.
 
+Questions and bug-report guidance live in [SUPPORT.md](SUPPORT.md); project
+direction lives in [ROADMAP.md](ROADMAP.md).
+
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT — see [LICENSE](LICENSE). Licences for dependencies bundled into standalone
+builds are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

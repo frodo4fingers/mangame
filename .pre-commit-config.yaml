@@ -1,6 +1,6 @@
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v5.0.0
+    rev: v6.0.0
     hooks:
       - id: trailing-whitespace
       - id: end-of-file-fixer
@@ -11,19 +11,40 @@ repos:
       - id: detect-private-key
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.9.6
+    rev: v0.16.3
     hooks:
       - id: ruff
         args: [--fix, --exit-non-zero-on-fix]
       - id: ruff-format
 
   - repo: https://github.com/zricethezav/gitleaks
-    rev: v8.18.0
+    rev: v8.30.0
     hooks:
       - id: gitleaks-docker
 
   - repo: local
     hooks:
+      - id: generated-artwork
+        name: generated artwork contract
+        entry: uv run python tools/gen_icons.py --check
+        language: system
+        pass_filenames: false
+        files: ^(tools/gen_icons.py|src/mangame/assets/emblems/|docs/icon-(reference.png|pixels.json))
+
+      - id: release-metadata
+        name: release metadata agreement
+        entry: uv run python tools/check_release.py
+        language: system
+        pass_filenames: false
+        files: ^(src/mangame/__init__.py|CHANGELOG.md|tools/check_release.py)
+
+      - id: third-party-notices
+        name: third-party notice agreement
+        entry: uv run python tools/gen_notices.py --check
+        language: system
+        pass_filenames: false
+        files: ^(pyproject.toml|uv.lock|THIRD_PARTY_NOTICES.md|tools/gen_notices.py)
+
       - id: mypy
         name: mypy type check
         entry: uv run mypy src tests tools

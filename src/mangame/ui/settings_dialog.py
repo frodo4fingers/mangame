@@ -6,7 +6,7 @@ edge of a screen, awkward to even display. A menu is a good place for *verbs*
 and a bad place for settings, so the verbs stayed (open, mark read, check now)
 and everything with a value moved here.
 
-Three tabs, matching the three things there are to configure:
+Four tabs, matching the things there are to configure and inspect:
 
 * **General** — the reading language, and the switches that used to sit at the
   top level.
@@ -14,6 +14,7 @@ Three tabs, matching the three things there are to configure:
   and adding or dropping one.
 * **Artwork** — turn any picture into an emblem. See :mod:`mangame.ui.artwork`
   for the transforms; this tab is the preview and the file picker around them.
+* **Diagnostics** — a copyable runtime report and the path to the rotating log.
 
 Changes apply as they are made rather than on an OK button. A tray app has no
 document to save, and an Apply step would only add a way to lose a change.
@@ -31,6 +32,7 @@ from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtGui import QColor, QImage, QPainter, QPixmap
 from PySide6.QtWidgets import (
     QAbstractItemView,
+    QApplication,
     QButtonGroup,
     QCheckBox,
     QComboBox,
@@ -45,6 +47,7 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QListWidget,
     QListWidgetItem,
+    QPlainTextEdit,
     QPushButton,
     QRadioButton,
     QStyle,
@@ -55,7 +58,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from mangame import __version__
+from mangame import __version__, diagnostics
 from mangame.domain.models import IconState
 from mangame.i18n.catalog import Translator, available
 from mangame.store.config import SeriesConfig, Settings
@@ -285,6 +288,7 @@ class SettingsDialog(QDialog):
         self._tabs.addTab(self._build_general(), self._t("dialog.settings.tab.general"))
         self._tabs.addTab(self._build_manga(), self._t("dialog.settings.tab.manga"))
         self._tabs.addTab(self._build_artwork(), self._t("dialog.settings.tab.artwork"))
+        self._tabs.addTab(self._build_diagnostics(), self._t("dialog.settings.tab.diagnostics"))
 
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close, self)
         buttons.rejected.connect(self.reject)
@@ -395,6 +399,43 @@ class SettingsDialog(QDialog):
         column.addWidget(self._per_manga)
         column.addWidget(hint)
         return box
+
+    def _build_diagnostics(self) -> QWidget:
+        page = QWidget(self)
+
+        hint = QLabel(self._t("dialog.settings.diagnostics.hint"), page)
+        hint.setWordWrap(True)
+
+        self._diagnostics = QPlainTextEdit(page)
+        self._diagnostics.setReadOnly(True)
+        self._diagnostics.setPlainText(diagnostics.report())
+
+        self._copy_diagnostics = QPushButton(
+            self._t("dialog.settings.diagnostics.copy"),
+            page,
+        )
+        self._copy_diagnostics.clicked.connect(self._copy_diagnostic_report)
+
+        self._diagnostic_status = QLabel("", page)
+        self._diagnostic_status.setEnabled(False)
+
+        actions = QHBoxLayout()
+        actions.setContentsMargins(0, 0, 0, 0)
+        actions.addWidget(self._copy_diagnostics)
+        actions.addWidget(self._diagnostic_status)
+        actions.addStretch(1)
+
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(0, PAGE_SPACING, 0, 0)
+        layout.setSpacing(PAGE_SPACING)
+        layout.addWidget(hint)
+        layout.addWidget(self._diagnostics, 1)
+        layout.addLayout(actions)
+        return page
+
+    def _copy_diagnostic_report(self) -> None:
+        QApplication.clipboard().setText(self._diagnostics.toPlainText())
+        self._diagnostic_status.setText(self._t("dialog.settings.diagnostics.copied"))
 
     def _build_manga(self) -> QWidget:
         page = QWidget(self)

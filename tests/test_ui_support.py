@@ -13,6 +13,7 @@ from mangame.domain.models import IconState
 from mangame.i18n.catalog import _CATALOGS, _EN, LANGUAGES, Translator, available
 from mangame.ui import emblems
 from mangame.ui.menu import fitted_position, menu_anchor
+from tools import gen_icons
 
 
 class TestTranslator:
@@ -83,6 +84,9 @@ BUNDLED = ["onepiece", "book", "mangame"]
 
 
 class TestEmblems:
+    def test_the_committed_pixels_match_the_generated_artwork_contract(self) -> None:
+        assert gen_icons.contract_problems() == []
+
     @pytest.mark.parametrize("emblem", BUNDLED)
     def test_the_bundled_artwork_is_shipped(self, emblem: str) -> None:
         assert emblem in emblems.available_emblems()

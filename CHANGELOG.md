@@ -8,7 +8,16 @@ uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
-- `MANGAME_HOME` puts settings, database and artwork in one directory of your
+- A Diagnostics tab with copyable runtime and support-file information, plus
+  rotating local logs for packaged GUI builds that have no console.
+- A stream-free packaged smoke test that cannot hang a release indefinitely.
+- Contributor-facing pull request, conduct, support, roadmap and artwork
+  guidance.
+- An approved icon contact sheet and generated-artwork contract that catches
+  stale SVGs, missing sizes and unreviewed pixel changes.
+- Release metadata agreement checks, dependency notices and SHA-256 checksums.
+- Python 3.14 CI coverage and immutable current GitHub Action revisions.
+- `MANGAME_HOME` puts settings, database, logs and artwork in one directory of your
   choosing — a portable install, or a second instance that leaves the first
   alone.
 - Standalone builds for Linux, Windows and both macOS architectures, produced

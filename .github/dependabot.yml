@@ -15,4 +15,4 @@ updates:
       prefix: "deps"
     groups:
       dev-tooling:
-        patterns: ["ruff", "mypy", "pytest*", "respx", "pre-commit", "pillow"]
+        patterns: ["ruff", "mypy", "pytest*", "respx", "pre-commit", "pillow", "packaging"]

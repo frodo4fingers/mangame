@@ -279,6 +279,7 @@ class TestWhereThingsLive:
 
         assert paths.config_file().parent == tmp_path / "portable"
         assert paths.database_file().parent == tmp_path / "portable"
+        assert paths.log_file().parent == tmp_path / "portable"
         assert paths.user_emblem_dir() == tmp_path / "portable" / "emblems"
 
     def test_the_directory_is_created_on_demand(

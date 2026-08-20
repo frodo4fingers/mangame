@@ -47,6 +47,7 @@ _EN: Final[dict[str, str]] = {
     "dialog.settings.tab.general": "General",
     "dialog.settings.tab.manga": "Manga",
     "dialog.settings.tab.artwork": "Artwork",
+    "dialog.settings.tab.diagnostics": "Diagnostics",
     "dialog.settings.language": "Reading language",
     "dialog.settings.language_hint": (
         "Only sources that publish in this language are polled, and the menu speaks it too."
@@ -91,6 +92,12 @@ _EN: Final[dict[str, str]] = {
     "dialog.settings.art.none": "Nothing imported yet",
     "dialog.settings.art.unused": "not used by any manga",
     "dialog.settings.art.remove": "Remove",
+    "dialog.settings.diagnostics.hint": (
+        "Copy this when reporting a problem. Review paths before sharing; the log may contain "
+        "source errors or local file names."
+    ),
+    "dialog.settings.diagnostics.copy": "Copy diagnostics",
+    "dialog.settings.diagnostics.copied": "Copied",
     "menu.settings": "Settings…",
     "tooltip.checking": "checking…",
 }
@@ -125,6 +132,7 @@ _CATALOGS: Final[dict[str, dict[str, str]]] = {
         "dialog.settings.tab.general": "Allgemein",
         "dialog.settings.tab.manga": "Manga",
         "dialog.settings.tab.artwork": "Bildmarken",
+        "dialog.settings.tab.diagnostics": "Diagnose",
         "dialog.settings.language": "Lesesprache",
         "dialog.settings.language_hint": (
             "Nur Quellen, die in dieser Sprache veröffentlichen, werden abgefragt — "
@@ -173,6 +181,12 @@ _CATALOGS: Final[dict[str, dict[str, str]]] = {
         "dialog.settings.art.none": "Noch nichts angelegt",
         "dialog.settings.art.unused": "von keinem Manga verwendet",
         "dialog.settings.art.remove": "Entfernen",
+        "dialog.settings.diagnostics.hint": (
+            "Beim Melden eines Problems kopieren. Pfade vor dem Teilen prüfen; "
+            "das Protokoll kann Quellenfehler oder lokale Dateinamen enthalten."
+        ),
+        "dialog.settings.diagnostics.copy": "Diagnose kopieren",
+        "dialog.settings.diagnostics.copied": "Kopiert",
         "menu.settings": "Einstellungen…",
         "tooltip.checking": "wird geprüft…",
     },
@@ -204,6 +218,7 @@ _CATALOGS: Final[dict[str, dict[str, str]]] = {
         "dialog.settings.tab.general": "General",
         "dialog.settings.tab.manga": "Manga",
         "dialog.settings.tab.artwork": "Emblemas",
+        "dialog.settings.tab.diagnostics": "Diagnóstico",
         "dialog.settings.language": "Idioma de lectura",
         "dialog.settings.language_hint": (
             "Solo se consultan fuentes que publican en este idioma, y el menú también lo habla."
@@ -251,6 +266,12 @@ _CATALOGS: Final[dict[str, dict[str, str]]] = {
         "dialog.settings.art.none": "Todavía no has creado ninguno",
         "dialog.settings.art.unused": "ningún manga lo usa",
         "dialog.settings.art.remove": "Eliminar",
+        "dialog.settings.diagnostics.hint": (
+            "Copia esto al informar de un problema. Revisa las rutas antes de compartir; "
+            "el registro puede contener errores de fuentes o nombres de archivos locales."
+        ),
+        "dialog.settings.diagnostics.copy": "Copiar diagnóstico",
+        "dialog.settings.diagnostics.copied": "Copiado",
         "menu.settings": "Ajustes…",
         "tooltip.checking": "comprobando…",
     },

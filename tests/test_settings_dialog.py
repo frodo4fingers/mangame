@@ -12,8 +12,17 @@ from pathlib import Path
 import pytest
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QImage, QPainter
-from PySide6.QtWidgets import QComboBox, QFrame, QGroupBox, QLabel, QTableWidgetItem, QWidget
+from PySide6.QtWidgets import (
+    QApplication,
+    QComboBox,
+    QFrame,
+    QGroupBox,
+    QLabel,
+    QTableWidgetItem,
+    QWidget,
+)
 
+from mangame import __version__
 from mangame.domain.models import IconState
 from mangame.i18n.catalog import Translator
 from mangame.store.config import SeriesConfig, Settings
@@ -217,6 +226,24 @@ class TestGeneralTab:
         widget = SettingsDialog(Translator("de"), settings().model_copy(update={"language": "de"}))
         assert widget.windowTitle() == "mangame-Einstellungen"
         assert widget._language.currentData() == "de"
+
+
+class TestDiagnosticsTab:
+    def test_it_shows_the_version_and_log_location(self, dialog: SettingsDialog) -> None:
+        text = dialog._diagnostics.toPlainText()
+
+        assert f"mangame {__version__}" in text
+        assert "Log:" in text
+
+    def test_the_report_can_be_copied(self, dialog: SettingsDialog) -> None:
+        QApplication.clipboard().clear()
+
+        dialog._copy_diagnostics.click()
+
+        assert QApplication.clipboard().text() == dialog._diagnostics.toPlainText()
+        assert dialog._diagnostic_status.text() == Translator("en")(
+            "dialog.settings.diagnostics.copied"
+        )
 
 
 class TestTrayMode:

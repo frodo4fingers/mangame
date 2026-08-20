@@ -10,19 +10,37 @@ no third-party character art or logo is ever reproduced.
 Run with:  uv run python tools/gen_icons.py
 """
 
+import argparse
+import hashlib
+import json
 import subprocess
-import sys
 from pathlib import Path
 
+from PIL import Image
 from pydantic import BaseModel, Field
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 OUT_ROOT = REPO_ROOT / "src" / "mangame" / "assets" / "emblems"
+REFERENCE = REPO_ROOT / "docs" / "icon-reference.png"
+PIXEL_MANIFEST = REPO_ROOT / "docs" / "icon-pixels.json"
 
 # Tray icons are tiny. 16-24px carries Windows/Linux panels, 36px covers a
 # retina macOS menu bar, the large sizes are for the .ico and about dialogs.
 PNG_SIZES = (16, 18, 20, 22, 24, 32, 36, 44, 48, 64, 128, 256)
 ICO_SIZES = (16, 20, 24, 32, 48, 64, 256)
+
+# The review sheet shows the sizes where visual regressions are easiest to
+# miss, on the two panel tones used by the in-app artwork preview.
+REFERENCE_SIZES = (16, 22, 32)
+REFERENCE_LIGHT = "#F2F2F2"
+REFERENCE_DARK = "#1B1B1B"
+REFERENCE_PANEL_WIDTH = 48
+REFERENCE_CELL_WIDTH = 2 * REFERENCE_PANEL_WIDTH
+REFERENCE_GAP = 4
+REFERENCE_PADDING = 6
+REFERENCE_CELL_HEIGHT = (
+    2 * REFERENCE_PADDING + sum(REFERENCE_SIZES) + REFERENCE_GAP * (len(REFERENCE_SIZES) - 1)
+)
 
 
 class Palette(BaseModel):
@@ -162,6 +180,133 @@ def _run(cmd: list[str]) -> None:
     subprocess.run(cmd, check=True, capture_output=True)
 
 
+def reference_image() -> Image.Image:
+    """The approved small-size view, on light and dark panels."""
+    sheet = Image.new(
+        "RGBA",
+        (len(PALETTES) * REFERENCE_CELL_WIDTH, len(EMBLEMS) * REFERENCE_CELL_HEIGHT),
+    )
+    for row, emblem in enumerate(EMBLEMS):
+        for column, palette in enumerate(PALETTES):
+            left = column * REFERENCE_CELL_WIDTH
+            top = row * REFERENCE_CELL_HEIGHT
+            sheet.paste(
+                REFERENCE_LIGHT,
+                (left, top, left + REFERENCE_PANEL_WIDTH, top + REFERENCE_CELL_HEIGHT),
+            )
+            sheet.paste(
+                REFERENCE_DARK,
+                (
+                    left + REFERENCE_PANEL_WIDTH,
+                    top,
+                    left + REFERENCE_CELL_WIDTH,
+                    top + REFERENCE_CELL_HEIGHT,
+                ),
+            )
+
+            icon_top = top + REFERENCE_PADDING
+            for size in REFERENCE_SIZES:
+                source = OUT_ROOT / emblem / palette.name / f"{size}.png"
+                with Image.open(source) as opened:
+                    icon = opened.convert("RGBA")
+                light_x = left + (REFERENCE_PANEL_WIDTH - size) // 2
+                dark_x = left + REFERENCE_PANEL_WIDTH + (REFERENCE_PANEL_WIDTH - size) // 2
+                sheet.alpha_composite(icon, (light_x, icon_top))
+                sheet.alpha_composite(icon, (dark_x, icon_top))
+                icon_top += size + REFERENCE_GAP
+    return sheet
+
+
+def write_reference() -> None:
+    REFERENCE.parent.mkdir(parents=True, exist_ok=True)
+    reference_image().save(REFERENCE)
+    PIXEL_MANIFEST.write_text(pixel_manifest_text(), encoding="utf-8")
+    print(f"built {REFERENCE.relative_to(REPO_ROOT)}")
+    print(f"built {PIXEL_MANIFEST.relative_to(REPO_ROOT)}")
+
+
+def pixel_manifest_text() -> str:
+    """Hashes of decoded pixels, so every shipped tray size is intentional."""
+    manifest: dict[str, str] = {}
+    for emblem in EMBLEMS:
+        for palette in PALETTES:
+            for size in PNG_SIZES:
+                path = OUT_ROOT / emblem / palette.name / f"{size}.png"
+                with Image.open(path) as opened:
+                    image = opened.convert("RGBA")
+                digest = hashlib.sha256()
+                digest.update(f"{image.width}x{image.height}\0".encode())
+                digest.update(image.tobytes())
+                manifest[str(path.relative_to(OUT_ROOT))] = digest.hexdigest()
+    return f"{json.dumps(manifest, indent=2, sort_keys=True)}\n"
+
+
+def contract_problems() -> list[str]:
+    """Anything that changed outside the approved generated-artwork contract."""
+    problems: list[str] = []
+    for emblem, render in EMBLEMS.items():
+        for palette in PALETTES:
+            directory = OUT_ROOT / emblem / palette.name
+            svg = directory / f"{emblem}-{palette.name}.svg"
+            if not svg.is_file():
+                problems.append(f"missing {svg.relative_to(REPO_ROOT)}")
+            elif svg.read_text(encoding="utf-8") != render(palette):
+                problems.append(f"stale {svg.relative_to(REPO_ROOT)}")
+
+            present = {int(path.stem) for path in directory.glob("*.png") if path.stem.isdigit()}
+            if present != set(PNG_SIZES):
+                problems.append(
+                    f"{directory.relative_to(REPO_ROOT)} has PNG sizes {sorted(present)}, "
+                    f"expected {list(PNG_SIZES)}"
+                )
+
+            for size in PNG_SIZES:
+                path = directory / f"{size}.png"
+                if not path.is_file():
+                    continue
+                try:
+                    with Image.open(path) as image:
+                        if image.size != (size, size):
+                            problems.append(
+                                f"{path.relative_to(REPO_ROOT)} is {image.size}, "
+                                f"expected {(size, size)}"
+                            )
+                        image.verify()
+                except OSError as exc:
+                    problems.append(f"unreadable {path.relative_to(REPO_ROOT)}: {exc}")
+
+            ico = directory / f"{emblem}-{palette.name}.ico"
+            if not ico.is_file():
+                problems.append(f"missing {ico.relative_to(REPO_ROOT)}")
+
+    if not REFERENCE.is_file():
+        problems.append(f"missing {REFERENCE.relative_to(REPO_ROOT)}")
+    elif not problems:
+        expected = reference_image()
+        with Image.open(REFERENCE) as opened:
+            actual = opened.convert("RGBA")
+        if actual.size != expected.size or actual.tobytes() != expected.tobytes():
+            problems.append(
+                f"stale {REFERENCE.relative_to(REPO_ROOT)}; "
+                "run tools/gen_icons.py --update-reference"
+            )
+    if not PIXEL_MANIFEST.is_file():
+        problems.append(f"missing {PIXEL_MANIFEST.relative_to(REPO_ROOT)}")
+    elif not problems and PIXEL_MANIFEST.read_text(encoding="utf-8") != pixel_manifest_text():
+        problems.append(
+            f"stale {PIXEL_MANIFEST.relative_to(REPO_ROOT)}; "
+            "run tools/gen_icons.py --update-reference"
+        )
+    return problems
+
+
+def check() -> None:
+    problems = contract_problems()
+    if problems:
+        raise SystemExit("\n".join(f"- {problem}" for problem in problems))
+    print("generated artwork matches its SVG and visual reference")
+
+
 def build(only: str | None = None) -> None:
     """Render every emblem, or just ``only``.
 
@@ -198,7 +343,22 @@ def build(only: str | None = None) -> None:
                 ]
             )
             print(f"built {emblem}/{palette.name}")
+    write_reference()
 
 
 if __name__ == "__main__":
-    build(sys.argv[1] if len(sys.argv) > 1 else None)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("emblem", nargs="?", choices=sorted(EMBLEMS))
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--check", action="store_true")
+    mode.add_argument("--update-reference", action="store_true")
+    args = parser.parse_args()
+
+    if (args.check or args.update_reference) and args.emblem:
+        parser.error("an emblem cannot be combined with --check or --update-reference")
+    if args.check:
+        check()
+    elif args.update_reference:
+        write_reference()
+    else:
+        build(args.emblem)

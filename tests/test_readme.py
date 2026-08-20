@@ -42,6 +42,9 @@ class TestPaths:
     def test_the_artwork_directory_is_named_as_it_is_written(self) -> None:
         assert f"{paths.user_emblem_dir().name}/" in TEXT
 
+    def test_the_log_is_named_as_it_is_written(self) -> None:
+        assert paths.log_file().name in TEXT
+
 
 class TestArtwork:
     def test_the_documented_icon_sizes_are_the_ones_rendered(self) -> None:
@@ -105,6 +108,12 @@ class TestWhatItPromisesToShip:
 
     def test_the_portable_directory_variable_is_named_correctly(self) -> None:
         assert paths.HOME_VAR in TEXT
+
+    def test_standalone_archives_carry_dependency_notices_and_checksums(self) -> None:
+        workflow = RELEASE.read_text(encoding="utf-8")
+
+        assert "THIRD_PARTY_NOTICES.md" in workflow
+        assert "SHA256SUMS" in workflow
 
 
 ROOT = README.parent

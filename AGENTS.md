@@ -27,7 +27,9 @@ uv run mangame               # run it
 uv run pytest                # fast, and needs neither network nor a display
 uv run ruff format .
 uv run ruff check .
-uv run mypy src tests tools
+uv run mypy --platform linux src tests tools
+uv run mypy --platform win32 src tests tools
+uv run mypy --platform darwin src tests tools
 ```
 
 Before claiming any change is done, run the full gate:
@@ -38,6 +40,7 @@ uv run mypy --platform linux src tests tools
 uv run mypy --platform win32 src tests tools
 uv run mypy --platform darwin src tests tools
 uv run pytest
+uv run python tools/gen_icons.py --check
 uv run pre-commit run --all-files
 ```
 
@@ -77,6 +80,7 @@ installed, or its shell rules silently do not run.
 | `src/mangame/sources/` | One adapter per site behind a shared protocol | The only place that talks to the network |
 | `src/mangame/store/` | SQLite state, JSON settings, platform paths, `.env` | `env.load()` runs before any path is resolved |
 | `src/mangame/service/` | Poller, library orchestration, start-on-login | Platform branching lives here |
+| `src/mangame/diagnostics.py` | Rotating logs and the copyable support report | Must work without stdout/stderr |
 | `src/mangame/ui/` | Tray, menus, dialogs, notifications, emblem rendering | Qt only here |
 | `src/mangame/i18n/` | Translation catalogue, language codes | en, de, es |
 | `tools/` | Artwork generators | Need `inkscape` and ImageMagick `convert` |
@@ -118,13 +122,15 @@ Each of these cost real debugging time. They are all still reachable.
 ```bash
 uv run python tools/gen_icons.py [emblem]   # tray sizes for one or all emblems
 uv run python tools/gen_app_icon.py         # the .ico/.icns for installers
+uv run python tools/gen_icons.py --check    # no renderer; checks the approved pixels
 ```
 
 A new emblem must read correctly at 16px in all three states.
 `TestEmblems` and `TestAppMark` in `tests/test_ui_support.py` measure that
 statistically, because a thin shape can look fine to the eye and still fail to
 read as a silhouette. Judge artwork by those measurements, and fix the drawing
-rather than the threshold.
+rather than the threshold. `docs/ARTWORK.md` is the visual contribution
+contract.
 
 ## Working notes
 

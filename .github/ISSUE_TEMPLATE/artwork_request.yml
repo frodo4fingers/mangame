@@ -1,0 +1,41 @@
+name: Artwork idea
+description: Propose a broadly useful generic emblem for the public wishlist.
+labels: [artwork]
+body:
+  - type: textarea
+    id: role
+    attributes:
+      label: What should this emblem communicate?
+      description: >
+        Describe the role it fills and why the M, book or generated badge does
+        not already cover it.
+    validations:
+      required: true
+
+  - type: textarea
+    id: shape
+    attributes:
+      label: Generic shape or concept
+      description: >
+        Keep it recognisable at 16 pixels. Do not propose character art,
+        publisher marks or series logos.
+    validations:
+      required: true
+
+  - type: textarea
+    id: states
+    attributes:
+      label: How should all three states remain distinct?
+      description: Consider ready in colour, due in grey and break as a rimmed silhouette.
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: rights
+    attributes:
+      label: Artwork rights
+      options:
+        - label: >
+            Any mock-up I attach is my original work and may be contributed
+            under the repository licence.
+          required: true

@@ -3,6 +3,11 @@
 Thanks for looking. This is a small project with a few firm opinions; the ones
 that would otherwise surprise you are written down here.
 
+Participation is covered by the [code of conduct](CODE_OF_CONDUCT.md).
+By submitting a contribution, you agree that it may be distributed under the
+repository's [MIT licence](LICENSE); submit only work you have the right to
+license that way.
+
 If you are working with an AI coding agent, point it at
 [AGENTS.md](AGENTS.md) — the same rules, stated the way an agent needs them.
 
@@ -13,10 +18,20 @@ Needs Python 3.12 or newer and [uv](https://docs.astral.sh/uv/).
 ```bash
 git clone https://github.com/frodo4fingers/mangame
 cd mangame
-uv sync --extra dev
+uv sync --locked --extra dev
 uv run pre-commit install
 uv run mangame
 ```
+
+The full pre-commit run includes gitleaks in Docker, so Docker must be
+available. Inkscape and ImageMagick are needed only when regenerating bundled
+artwork.
+
+Dependabot updates Python and GitHub Actions dependencies. `renovate.json5`
+covers pre-commit hook revisions, which Dependabot does not manage; enable the
+Renovate GitHub app after the repository is published. Maintainers should
+apply [docs/REPOSITORY_SETUP.md](docs/REPOSITORY_SETUP.md) once to configure
+the settings Git cannot carry.
 
 ## The loop
 
@@ -26,7 +41,7 @@ Everything CI runs, you can run:
 uv run pytest                       # no network, no display
 uv run ruff format .
 uv run ruff check .
-uv run mypy src tests tools
+uv run mypy --platform linux src tests tools
 uv run mypy --platform win32 src tests tools
 uv run mypy --platform darwin src tests tools
 uv run pre-commit run --all-files
@@ -57,17 +72,33 @@ yours wants either, it is testing the wrong thing.
 ## Adding a source
 
 `src/mangame/sources/` holds one module per site behind a small protocol.
-[README.md](README.md#adding-a-source) walks through it.
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#1-sources-only-report-timestamps)
+explains why the contract is deliberately small.
 
 One rule learned the hard way: **fetch the real endpoint and read the actual
 payload before writing the parser.** Adapters written from documentation alone
 have shipped subtly wrong behaviour every time.
+
+A source contribution must:
+
+1. implement the `Source` protocol in `sources/base.py`;
+2. declare search, chapter/status and language capabilities honestly;
+3. set a conservative rate limit and use the shared HTTP client;
+4. register the adapter in `sources/registry.py`;
+5. add `respx` tests for search, parsing, failures, conditional requests and
+   language filtering without touching the network;
+6. update the README and security documentation when the app contacts a new
+   domain.
+
+If a site already exposes RSS or Atom, prefer the built-in `feed` source over a
+new adapter.
 
 ## Artwork
 
 Bundled emblems are generated, never hand-edited:
 
 ```bash
+uv run python tools/gen_icons.py --check
 uv run python tools/gen_icons.py [emblem]   # tray sizes, needs inkscape + convert
 uv run python tools/gen_app_icon.py         # the .ico/.icns for installers
 ```
@@ -77,24 +108,21 @@ and `TestAppMark` in `tests/test_ui_support.py` measure that statistically
 rather than trusting the eye — a thin shape can look fine and still fail to
 read as a silhouette.
 
+Read [docs/ARTWORK.md](docs/ARTWORK.md) before proposing bundled artwork. It
+defines the approved pixel reference and the original-work requirement.
+
 ## Releasing
 
-1. Update `CHANGELOG.md` and the `version` in `pyproject.toml`.
-2. Tag it: `git tag v0.2.0 && git push --tags`.
-3. `.github/workflows/release.yml` freezes the app for Linux, Windows and
-   both macOS architectures, checks each build starts, and attaches them to a
-   GitHub Release together with the wheel and sdist.
-
-Publishing to PyPI is off by default. To turn it on, register this repository
-as a [trusted publisher](https://docs.pypi.org/trusted-publishers/) for the
-`mangame` project, add a repository environment named `pypi`, and set the
-repository variable `PUBLISH_TO_PYPI` to `true`.
-
-macOS builds are unsigned; signing and notarising them needs an Apple
-Developer certificate that this project does not have.
+Follow [docs/RELEASING.md](docs/RELEASING.md). The only version number is
+`__version__` in `src/mangame/__init__.py`; `pyproject.toml` reads it
+dynamically.
 
 ## Pull requests
 
 Small and focused, with a test that fails without the change. If you are
 fixing a bug, the test name should state the real-world shape it guards
 against.
+
+Use the pull request template. UI and artwork changes need before/after images.
+The public wishlist is the issue tracker and its milestones; [ROADMAP.md](ROADMAP.md)
+contains direction only.

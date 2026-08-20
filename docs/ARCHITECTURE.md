@@ -460,12 +460,23 @@ once, on `sys.platform`:
   can carry `LSUIElement`, and without that a tray-only app still claims a Dock
   tile it has no use for.
 
-Every build is started once on its runner before it is allowed near a release
-page. On a headless runner it exits 1 with *no system tray found* — which is
-the correct answer, and proves the bootloader ran, Qt loaded and `main()` was
-reached. A bundle that cannot do that much is broken in a way no unit test
+Every build runs a hidden `--smoke-test` once on its runner before it is
+allowed near a release page. The mode opens the settings/database paths and
+loads the bundled app icon, then exits without creating a tray or depending on
+stdout/stderr. That last constraint matters on Windows, where a PyInstaller
+`console=False` executable has neither stream. The workflow also imposes a
+30-second timeout, so a platform unexpectedly reporting a tray cannot hang the
+release forever. A bundle that cannot do that much is broken in a way no unit test
 would catch.
 
 The same reasoning covers the wheel: CI installs the built artifact into a
 fresh environment and asserts the emblem directory is present and populated. A
 wheel that imports cleanly but ships no artwork starts with an empty tray.
+
+### Diagnostics survive packaging
+
+`diagnostics.configure_logging()` always installs a rotating file handler and
+adds stderr only when one exists. Settings → Diagnostics exposes the version,
+runtime, platform and support-file paths without including the user's library.
+The report is copyable; the log remains separate because source failures may
+contain a URL or local path that should be reviewed before sharing.
