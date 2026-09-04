@@ -255,7 +255,6 @@ class TestWhatThisChangesForTheReader:
             language="de",
             source_refs={"mangaplus": "100020", "onepiecetube": onepiecetube.LIST_URL},
             latest_chapter=latest,
-            last_read_number=self.OFFICIAL.number,
             last_read_external_id=self.OFFICIAL.external_id,
             last_read_at=self.OFFICIAL.published_at,
             # A fortnightly Sunday rhythm, which is what both the learned
