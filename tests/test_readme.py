@@ -7,8 +7,12 @@ Windows data directory under one platformdirs does not use, and the test count
 under a number three releases old.
 
 Only facts that appear verbatim in both places are pinned, so ordinary editing
-stays free. Every markdown file in the repository has its relative links
-checked, because five of them now cross-reference each other.
+stays free. The pins are checked against the whole published guide — the README
+plus `docs/` — because a fact is not stale for having moved out of the README
+into the reference page that suits it better. Download names stay pinned to the
+README alone, since that promise belongs on the landing page. Every markdown
+file in the repository has its relative links checked, because five of them now
+cross-reference each other.
 """
 
 import re
@@ -24,50 +28,59 @@ from mangame.ui import emblems
 README = Path(__file__).resolve().parents[1] / "README.md"
 TEXT = README.read_text(encoding="utf-8")
 
-RELEASE = README.parent / ".github" / "workflows" / "release.yml"
+ROOT = README.parent
+
+# The published guide, as a reader would meet it: the landing page plus every
+# reference page it hands off to. CHANGELOG.md is deliberately excluded — its
+# historical entries may name things the code has since renamed, which would
+# quietly defeat the stale-name checks below.
+GUIDES = [README, *sorted((ROOT / "docs").glob("*.md"))]
+DOCUMENTED = "\n".join(p.read_text(encoding="utf-8") for p in GUIDES)
+
+RELEASE = ROOT / ".github" / "workflows" / "release.yml"
 RELEASE_LABELS = set(re.findall(r"label: ([a-z0-9_-]+)", RELEASE.read_text(encoding="utf-8")))
 
 
 class TestPaths:
     def test_the_database_is_named_as_it_is_written(self) -> None:
-        assert paths.database_file().name in TEXT
+        assert paths.database_file().name in DOCUMENTED
 
     def test_no_earlier_name_for_it_survives(self) -> None:
-        stale = set(re.findall(r"\b[\w-]+\.(?:db|sqlite3?)\b", TEXT))
+        stale = set(re.findall(r"\b[\w-]+\.(?:db|sqlite3?)\b", DOCUMENTED))
         assert stale <= {paths.database_file().name}
 
     def test_the_settings_file_is_named_as_it_is_written(self) -> None:
-        assert paths.config_file().name in TEXT
+        assert paths.config_file().name in DOCUMENTED
 
     def test_the_artwork_directory_is_named_as_it_is_written(self) -> None:
-        assert f"{paths.user_emblem_dir().name}/" in TEXT
+        assert f"{paths.user_emblem_dir().name}/" in DOCUMENTED
 
     def test_the_log_is_named_as_it_is_written(self) -> None:
-        assert paths.log_file().name in TEXT
+        assert paths.log_file().name in DOCUMENTED
 
 
 class TestArtwork:
     def test_a_drop_in_is_documented_as_one_source_png(self) -> None:
-        assert "emblems/<manga>.png" in TEXT
+        assert "emblems/<manga>.png" in DOCUMENTED
 
     def test_the_documented_states_are_the_ones_derived(self) -> None:
-        written = re.search(r"<((?:\w+\|)+\w+)>\.png", TEXT)
+        written = re.search(r"<((?:\w+\|)+\w+)>\.png", DOCUMENTED)
         assert written is not None
         assert set(written.group(1).split("|")) == {s.value for s in IconState}
 
     @pytest.mark.parametrize("emblem", ["onepiece", "book", "mangame"])
     def test_every_emblem_it_names_is_shipped(self, emblem: str) -> None:
-        assert emblem in TEXT
+        assert emblem in DOCUMENTED
         assert emblem in emblems.available_emblems()
 
 
 class TestLanguages:
     @pytest.mark.parametrize("code", languages.codes())
     def test_every_offered_language_has_a_row(self, code: str) -> None:
-        assert f"`{code}`" in TEXT
+        assert f"`{code}`" in DOCUMENTED
 
     def test_it_does_not_promise_a_language_that_cannot_be_polled(self) -> None:
-        promised = set(re.findall(r"^\| \w+ \| `([\w`, -]+)` \|", TEXT, re.MULTILINE))
+        promised = set(re.findall(r"^\| \w+ \| `([\w`, -]+)` \|", DOCUMENTED, re.MULTILINE))
         offered = {c for row in promised for c in re.findall(r"[\w-]+", row)}
         assert offered <= set(languages.codes()) | set(languages.source_codes("es"))
 
@@ -75,13 +88,13 @@ class TestLanguages:
 class TestFileOnlySettings:
     def test_the_tray_icon_cap_is_documented_at_its_real_default(self) -> None:
         default = config.Settings().max_tray_icons
-        assert re.search(rf"`max_tray_icons` \| `{default}`", TEXT)
+        assert re.search(rf"`max_tray_icons` \| `{default}`", DOCUMENTED)
 
     @pytest.mark.parametrize("key", ["max_tray_icons", "enabled", "language"])
     def test_it_only_documents_keys_that_exist(self, key: str) -> None:
         fields = set(config.Settings.model_fields) | set(config.SeriesConfig.model_fields)
         assert key in fields
-        assert key in TEXT
+        assert key in DOCUMENTED
 
 
 class TestWhatItPromisesToShip:
@@ -112,7 +125,6 @@ class TestWhatItPromisesToShip:
         assert "SHA256SUMS" in workflow
 
 
-ROOT = README.parent
 DOCS = sorted(p for p in [*ROOT.glob("*.md"), *(ROOT / "docs").glob("*.md")])
 
 
