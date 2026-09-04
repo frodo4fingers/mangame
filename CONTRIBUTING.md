@@ -112,6 +112,23 @@ that statistically rather than trusting the eye.
 Read [docs/ARTWORK.md](docs/ARTWORK.md) before proposing bundled artwork. It
 defines the one-PNG workflow and the original-work requirement.
 
+## Building a standalone executable
+
+```bash
+uv sync --extra build
+uv run pyinstaller packaging/mangame.spec --noconfirm
+```
+
+That leaves `dist/mangame` on Linux, `dist/mangame.exe` on Windows and
+`dist/mangame.app` on macOS. The release workflow runs the same command on a
+runner for each platform, so a build you can reproduce locally is the build
+users download.
+
+The installer icons in `packaging/icons/` are generated from
+`artwork/mangame.png` and packed into the containers each platform requires —
+`mangame.ico` for Windows, `mangame.icns` for macOS. Re-run
+`tools/gen_app_icon.py` above after changing that source picture.
+
 ## Releasing
 
 Follow [docs/RELEASING.md](docs/RELEASING.md). The only version number is

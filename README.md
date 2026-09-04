@@ -6,6 +6,9 @@
 
 A system-tray app that tells you, at a glance, whether there is manga to read.
 
+![A tray tooltip reading "One Piece — ch. 1192 is ready to read", followed by
+the reading language and the sources that were checked](docs/images/tray-ready.png)
+
 One icon per series. Three states, and nothing else to interpret:
 
 | Icon | Meaning |
@@ -14,10 +17,15 @@ One icon per series. Three states, and nothing else to interpret:
 | **Grey** | You are caught up; the next chapter is due. |
 | **Black** | A break has been announced — there is no chapter this week. |
 
-Or one icon for everything: mangame's own **M** wears the same three states,
-and reports the best news in your library. Pick either in Settings — and if you
-would rather the aggregate icon wore a straw hat, a book or your own artwork,
-pick that too.
+![The same tooltip a few days earlier, reading "One Piece — next chapter
+expected So 06 Sep 15:00 UTC"](docs/images/tray-due.png)
+
+Hovering says the rest: what is waiting or when it is expected, in which
+language, and which sources agreed on it.
+
+Or use one icon for everything — mangame's own **M** wears the same three
+states and reports the best news in your library. Pick either in Settings, and
+give the aggregate icon a straw hat, a book or your own artwork if you prefer.
 
 Runs on Linux, Windows and macOS — in the system tray, the notification area,
 or the menu bar, whichever your desktop calls it.
@@ -28,8 +36,6 @@ or the menu bar, whichever your desktop calls it.
 
 No Python, no toolchain — grab the file for your platform from the
 [releases page](https://github.com/frodo4fingers/mangame/releases) and run it.
-If the first public release has not been published yet, use
-[Run from source](#run-from-source).
 
 | Platform | File | Then |
 | --- | --- | --- |
@@ -44,13 +50,11 @@ Two things the operating system will ask about:
   Gatekeeper blocks the first launch. Right-click it and choose *Open*, or run
   `xattr -dr com.apple.quarantine mangame.app`.
 - **Linux** — if your browser cleared the executable bit, `chmod +x mangame`.
-  The archive also carries `mangame.desktop` and `mangame.png`; copy them into
-  `~/.local/share/applications/` and
-  `~/.local/share/icons/hicolor/512x512/apps/` to get a normal launcher entry.
+  For a normal launcher entry, copy the bundled `mangame.desktop` into
+  `~/.local/share/applications/` and `mangame.png` into
+  `~/.local/share/icons/hicolor/512x512/apps/`.
 
 ### Install from PyPI
-
-If you already have Python 3.12 or newer:
 
 ```bash
 uv tool install mangame   # or: pipx install mangame
@@ -71,272 +75,108 @@ uv run mangame
 However you start it, there is no window — everything happens in the tray menu.
 Turn on **Start on login** in Settings to have it come back by itself.
 
-## The menu
+## Using it
 
-**Either mouse button opens it.** An icon in a panel shows nothing but a
+**Either mouse button opens the menu.** An icon in a panel shows nothing but a
 picture, so whichever button you try first has to arrive somewhere.
 
-The menu holds verbs only — the things you *do*:
+The menu holds verbs only — Open chapter, Mark as read, Add manga, Check now,
+Settings, Quit. Nothing nests, and everything with a *value* lives in the
+settings window instead, so the menu stays one flat list that cannot run off the
+edge of a screen.
 
-- **Open chapter / Mark as read** — only when there is something to open.
-- **Add manga…**
-- **Check now**
-- **Settings…**
-- **Quit**
+**Settings…** opens one window with four tabs: **General** (reading language,
+one icon or one per manga, notifications, start on login), **Manga** (which
+series get their own icon, the emblem each wears, and adding or dropping one),
+**Artwork** (turn any picture into an emblem) and **Diagnostics** (version and
+support-file paths for a bug report). Changes take effect as you make them.
 
-Nothing nests. Everything with a *value* lives in the settings window instead,
-which keeps the menu to one flat list that cannot run off the edge of a screen.
-
-## Settings
-
-**Settings…** opens one window with four tabs:
-
-- **General** — the reading language, whether the panel shows one icon for the
-  whole library (and which emblem it wears) or one per manga, new-chapter
-  notifications, and start on login (an XDG `.desktop` entry on Linux, an
-  `HKCU\...\Run` value on Windows, a LaunchAgent plist on macOS).
-- **Manga** — which series get their own tray icon, which emblem each one
-  wears, and adding or dropping a series.
-- **Artwork** — turn any picture into an emblem; see [Your own
-  artwork](#your-own-artwork).
-- **Diagnostics** — copy the version, runtime, platform and local support-file
-  paths for a bug report.
-
-Changes take effect as you make them. Choosing a different reading language
-re-opens the window in that language, because it is the menu language too.
-
-## Adding a manga
-
-**Add manga…** opens one window that does the whole job: type a title,
-hit Enter, pick a result, choose Add. The field, the results and the outcome
-stay on screen, so a search that found the wrong thing is one edit away from
-the right one.
-
-Results are grouped by series rather than listed per source. One row reading
+**Add manga…** does the whole job in one window: type a title, hit Enter, pick
+a result, choose Add. Results are grouped by series rather than listed per
+source, so one row like
 
 ```
 One Piece (1997)
 mangadex · mangaupdates · anilist
 ```
 
-is one series found by three sources, and Add links all of them — MangaDex
-supplies chapter times, AniList supplies the hiatus flag, and a series needs
-both to use all three icon states. Anything you already track is greyed out and
-labelled, instead of silently doing nothing when you add it twice.
+is one series found by three sources, and Add links all of them — MangaDex and
+MangaUpdates supply chapter times, while AniList supplies the hiatus flag. A
+series needs both to use all three icon states. Anything you already track is
+greyed out.
 
 Only sources that can serve your reading language are searched, so every result
 is one that can actually be tracked.
 
-## How often it checks
-
-You never set an interval. mangame learns each series' release rhythm from the
-timestamps it has already seen, and asks more often the closer the next chapter
-gets:
-
-| Situation | Checked about every |
-| --- | --- |
-| Next chapter more than three days away | a day |
-| Three days to twelve hours away | six hours |
-| Twelve hours to two hours away | an hour |
-| Due within two hours, or overdue by less than twelve | ten minutes |
-| Overdue by up to three days | 45 minutes |
-| Overdue for a fortnight or more | six hours, then a day |
-| A chapter is waiting, unread | twelve hours |
-| On an announced break | a day, tightening to 15 minutes as it ends |
-| Series finished or cancelled | a week |
-
-Never faster than five minutes, never slower than a week, and never faster than
-a source allows. Each series is nudged off its neighbours by a fixed amount
-derived from its name, so tracking thirty titles does not fire thirty requests
-in the same second. Requests are conditional, so a check that finds nothing new
-usually transfers nothing. Timing is by wall clock rather than by sleeping, so
-a laptop that suspends overnight catches up the moment it wakes instead of
-starting the clock again.
-
-**Check now** in the menu ignores all of that and asks immediately.
-
-It talks only to those sources. There is no telemetry, no analytics and no
-update check — see [SECURITY.md](SECURITY.md).
-
 ## Languages
 
-The three supported languages are the ones the sources can actually be held to:
+English, Español and Deutsch — the three the sources can actually be held to.
+A per-series language overrides the global one, for the single title you follow
+in a different language from the rest.
 
-| Language | Codes asked for | Chapter sources |
-| --- | --- | --- |
-| English | `en` | MangaDex, MangaUpdates, feeds |
-| Español | `es`, `es-la` | MangaDex, feeds |
-| Deutsch | `de` | MangaDex, feeds |
+Which source serves which language, and why MangaUpdates is English-only, is in
+[docs/CONFIGURATION.md](docs/CONFIGURATION.md#languages-in-detail).
 
-Spanish asks for two codes because MangaDex files Latin-American translations
-under `es-la`; both are stored as `es`, so you see whichever lands first.
+## How often it checks
 
-MangaUpdates is English-only on purpose. Its release records carry no language
-field and its `lang` filter is silently ignored, so anything else would be an
-English scanlation presented as a German one. AniList is asked in every
-language: it reports hiatus and status, never chapters, and those are true
-whichever translation you wait for.
+You never set an interval. mangame learns each series' rhythm from the
+timestamps it has already seen and asks more often the closer the next chapter
+gets — about daily when it is a week away, down to every ten minutes when it is
+due. Requests are conditional, so a check that finds nothing new usually
+transfers nothing, and a laptop that suspends overnight catches up the moment it
+wakes. **Check now** ignores all of it and asks immediately.
 
-A per-series `language` in `config.json` overrides the global setting, for the
-one title you follow in a different language from the rest.
+The full ladder is in
+[docs/CONFIGURATION.md](docs/CONFIGURATION.md#how-often-it-checks). mangame
+talks only to those sources: no telemetry, no analytics, no update check — see
+[SECURITY.md](SECURITY.md).
 
-## Where things are stored
+## Settings, storage and your own sources
 
-Resolved by `platformdirs`, so they land wherever your OS expects:
+Settings, database, logs and artwork land wherever your OS expects, and
+`MANGAME_HOME` puts them all in one directory instead — for a portable copy on
+a stick, or a second instance that leaves the first alone. `config.json` is
+plain JSON and safe to hand-edit while the app runs.
 
-| What | Linux | Windows | macOS |
-| --- | --- | --- | --- |
-| Settings | `~/.config/mangame/config.json` | `%APPDATA%\mangame\config.json` | `~/Library/Application Support/mangame/config.json` |
-| Database | `~/.local/share/mangame/state.sqlite3` | `%APPDATA%\mangame\state.sqlite3` | `~/Library/Application Support/mangame/state.sqlite3` |
-| Your own artwork | `~/.local/share/mangame/emblems/` | `%APPDATA%\mangame\emblems\` | `~/Library/Application Support/mangame/emblems/` |
-| Logs | `~/.local/state/mangame/log/mangame.log` | `%APPDATA%\mangame\Logs\mangame.log` | `~/Library/Logs/mangame/mangame.log` |
+Any site with an RSS/Atom feed can be tracked by adding a config entry rather
+than writing code, because a feed carries the only two things mangame needs:
+titles and timestamps.
 
-On Linux the `XDG_CONFIG_HOME`, `XDG_DATA_HOME` and `XDG_STATE_HOME` variables
-are honoured if you set them.
-
-Set `MANGAME_HOME` to put settings, database, logs and artwork in one directory
-of your choosing instead — for a portable copy on a USB stick, or to run a
-second instance without disturbing the first. It works the same on all three
-platforms:
-
-```bash
-MANGAME_HOME=/media/stick/mangame mangame
-```
-
-`config.json` is plain JSON and safe to hand-edit while the app is running —
-every poll re-reads it.
-
-### Pointing mangame somewhere else
-
-Two variables move things around, and a `.env` file is a convenient place to
-keep them:
-
-| Variable | What it does |
-| --- | --- |
-| `MANGAME_HOME` | Settings, database, logs and artwork all in this one directory. |
-| `MANGAME_EMBLEM_DIR` | Imported artwork here, wherever the rest lives. |
-| `MANGAME_ENV_FILE` | Read those from this file instead of a `.env`. |
-
-Copy [`.env.example`](.env.example) to `.env` and uncomment what you need.
-mangame reads the first one it finds:
-
-1. `$MANGAME_ENV_FILE`, if you set it
-2. `.env` in the current directory — handy when running from a clone
-3. `.env` beside the executable — a portable install carries its own
-4. `.env` in the configuration directory above — the only one a copy started
-   at login will find, since it has no meaningful working directory
-
-A variable already set in the real environment always wins over the file, so
-the one-off above keeps working. `.env` is git-ignored: nothing about your
-setup belongs in the repository.
-
-## Settings only the file has
-
-Everything in the settings window is in `config.json` too, plus a few things
-that are not worth a control:
-
-| Key | Default | What it does |
-| --- | --- | --- |
-| `max_tray_icons` | `8` | How many icons one-per-manga mode may draw. Past this the rest are simply not shown, so a long library does not fill the panel — switch to one icon for everything instead. |
-| `series[].enabled` | `true` | Set to `false` to stop polling a series without dropping what is already known about it. |
-| `series[].language` | unset | Overrides the reading language for one title; see [Languages](#languages). |
-
-## Adding a source
-
-Almost every manga site, tracker and publisher blog already publishes an
-RSS/Atom feed, and a feed carries the only two things mangame needs: item
-titles and publication timestamps. So the built-in `feed` source takes the feed
-URL as its reference, and adding a site is a config entry rather than a code
-change:
-
-```jsonc
-{
-  "series": [
-    {
-      "key": "my-series",
-      "title": "My Series",
-      "emblem": "onepiece",
-      "sources": {
-        "feed": "https://example.test/series/my-series/rss"
-      }
-    }
-  ]
-}
-```
-
-Everything downstream — release rhythm, expected next chapter, break detection,
-how often to poll, which icon to draw — is derived from those timestamps. See
-[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+Paths, environment variables, the `.env` lookup order, the keys that have no
+control, and the feed recipe are all in
+[docs/CONFIGURATION.md](docs/CONFIGURATION.md).
 
 ## Your own artwork
 
-Drop one PNG named for the manga into the user emblem directory:
+Drop one PNG named for the manga into the emblem directory — `Hunter x
+Hunter.png` is matched to `hunter-x-hunter` without editing config — and
+mangame derives the ready, due and break versions behind it. **Settings ▸
+Artwork** is the same thing with a file picker, and tells you which manga the
+filename matched before importing.
 
-```text
-emblems/<manga>.png
-
-# for example
-emblems/Hunter x Hunter.png
-```
-
-On the next refresh mangame creates the ready, due and break versions behind
-it. The filename is matched to the tracked title, so that example is used by
-`hunter-x-hunter` without editing config. Replace the source PNG to regenerate
-it.
-
-**Settings ▸ Artwork** is the same workflow with a file picker. It also accepts
-SVG and other common image formats, stores one normalised PNG, and says which
-manga the filename matched before importing.
-
-Importing installs the picture *and* gives it to that manga, in one step. Pick
-**A shared emblem…** instead to name it yourself and use it for several series;
-the list under **Your artwork** shows which manga wears each one, or that none
-does yet.
-
-The generated files are:
-
-```text
-emblems/<name>/<ready|due|break>.png
-```
-
-Ready keeps the source colour, due is remapped into a mid-grey band, and break
-is a near-black silhouette with a near-white rim. The rim keeps it visible on
-both light and dark panels. Qt scales the 256px state image to the size the
-panel requests; a separate file for every possible panel size is unnecessary.
-
-Any series whose emblem is *Generated badge* — or whose artwork has gone
-missing — gets a monogram: its initial on a colour derived from the title. Two
-untouched series therefore never look alike.
-
-The bundled straw hat, book and M are original work; see
-[Development](#development) to redraw them.
+Anything without artwork gets a monogram: its initial on a colour derived from
+the title, so two untouched series never look alike. Details and the
+contributor workflow are in [docs/ARTWORK.md](docs/ARTWORK.md).
 
 ## Desktop support
 
-mangame uses Qt's `QSystemTrayIcon`, so it sits wherever the platform puts one:
-the notification area on Windows, the menu bar on macOS, the panel on Linux.
-
-On Linux that means the StatusNotifierItem protocol. KDE, XFCE, Cinnamon, MATE
+mangame uses Qt's `QSystemTrayIcon`, so it sits wherever the platform puts one.
+On Linux that means the StatusNotifierItem protocol: KDE, XFCE, Cinnamon, MATE
 and most tiling-WM bars support it out of the box. **GNOME needs the
 [AppIndicator and KStatusNotifierItem](https://extensions.gnome.org/extension/615/appindicator-support/)
 extension**, which GNOME does not ship by default; without it no tray icon can
 appear, for any application.
 
-Some panels report where they drew the icon and some do not. Where they do, the
-menu opens against the icon; where they do not, it opens at the pointer. Either
-way it is kept inside the desktop's work area, so it is never left behind a
-panel or off the edge of the screen.
+Where a panel reports the icon's position the menu opens against it, and where
+it does not the menu opens at the pointer — either way inside the work area, so
+it is never left behind a panel or off the screen.
 
 ## Development
 
 ```bash
 uv sync --extra dev
-uv run pytest                                   # no network, no display
-uv run ruff format .
-uv run ruff check .
-uv run mypy --platform linux src tests tools
-uv run mypy --platform win32 src tests tools
-uv run mypy --platform darwin src tests tools
+uv run pytest          # no network, no display
+uv run ruff format . && uv run ruff check .
 uv run pre-commit install
 ```
 
@@ -344,47 +184,10 @@ The domain layer (`src/mangame/domain/`) is pure: no I/O, no clock, no
 network — the current time is always passed in. That is what makes the
 release-rhythm, break-detection and scheduling rules directly testable.
 
-Bundled artwork follows the same one-PNG rule. Drop an original source into
-`artwork/`, then generate the three state files:
-
-```bash
-uv run python tools/gen_icons.py           # all of them
-uv run python tools/gen_icons.py mangame   # one source
-uv run python tools/gen_icons.py --check
-```
-
-No external renderer is needed. See [`docs/ARTWORK.md`](docs/ARTWORK.md).
-
-The installer icons in `packaging/icons/` come from `artwork/mangame.png` and
-are packed into the containers Windows and macOS require:
-
-```bash
-uv run python tools/gen_app_icon.py
-```
-
-### Building a standalone executable
-
-```bash
-uv sync --extra build
-uv run pyinstaller packaging/mangame.spec --noconfirm
-```
-
-That leaves `dist/mangame` on Linux, `dist/mangame.exe` on Windows and
-`dist/mangame.app` on macOS. The release workflow runs the same command on a
-runner for each platform, so a build you can reproduce locally is the build
-users download.
-
-### Continuous integration
-
-`.github/workflows/ci.yml` runs the tests on Linux, Windows and macOS against
-Python 3.12, 3.13 and 3.14, plus formatting, linting, type-checking for all
-three target platforms, the pre-commit hooks, and checks that generated artwork
-is approved and an installed wheel can still find it.
-`.github/workflows/release.yml` builds the executables and publishes them when
-a `v*` tag is pushed.
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the full loop, and
-[AGENTS.md](AGENTS.md) if you are working with an AI coding agent.
+[CONTRIBUTING.md](CONTRIBUTING.md) has the full loop, including type-checking
+each target platform and building a standalone executable.
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) explains why it is built this way,
+and [AGENTS.md](AGENTS.md) is for working with an AI coding agent.
 
 Questions and bug-report guidance live in [SUPPORT.md](SUPPORT.md); project
 direction lives in [ROADMAP.md](ROADMAP.md).

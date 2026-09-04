@@ -28,9 +28,16 @@ The paths are:
 - Windows: `%APPDATA%\mangame\emblems\`
 - macOS: `~/Library/Application Support/mangame/emblems/`
 
-`MANGAME_HOME` and `MANGAME_EMBLEM_DIR` override those locations as documented
-in the README. Settings → Artwork remains available when using a file picker
-is more convenient.
+`MANGAME_HOME` and `MANGAME_EMBLEM_DIR` override those locations, as documented
+in [CONFIGURATION.md](CONFIGURATION.md). Settings ▸ Artwork remains available
+when using a file picker is more convenient: it accepts SVG and other common
+image formats, stores one normalised PNG, and says which manga the filename
+matched before importing.
+
+Importing installs the picture *and* gives it to that manga in one step. Pick
+**A shared emblem…** instead to name it yourself and use it for several series;
+the list under **Your artwork** shows which manga wears each one, or that none
+does yet.
 
 The three generated states are fixed:
 
