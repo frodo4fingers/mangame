@@ -6,6 +6,11 @@ uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.0]
+
+The `v0.2.0` tag is unsigned because tag signing is still not configured for
+this project.
+
 ### Added
 
 - A first run now starts already following One Piece, with the emblem the app
@@ -19,6 +24,24 @@ uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
   "expected Sunday" while the chapter is already on screen. Only chapters the
   site can actually serve are reported, so the icon never turns on for an
   entry that opens on nothing.
+
+### Changed
+
+- The README is a page again rather than a manual. It now opens with the thing
+  it describes — one tray tooltip for a chapter ready to read, one for the same
+  series still waiting — because the three icon states are easier to show than
+  to explain. The reference material it had accumulated moved to
+  `docs/CONFIGURATION.md`, which is the better home for storage paths, the
+  environment variables and `.env` precedence, the settings only the file has,
+  the polling ladder, and which source serves which language.
+- The documentation tests hold the whole published guide to the code, not just
+  the README. Pinning file names, defaults and language codes to one file meant
+  a fact could not be moved to a more suitable page without looking deleted.
+- Runtime dependencies are pydantic 2.13.5, PySide6 Essentials 6.11.2 and
+  platformdirs 4.11.5; the release workflow moved to current majors of the
+  artifact upload, artifact download, setup-uv and release actions.
+  `THIRD_PARTY_NOTICES.md` records the exact versions the binaries on this tag
+  were built with.
 
 ### Fixed
 
@@ -81,5 +104,6 @@ initial release.
 - Cross-platform CI now runs tests with the requested interpreter and validates
   generated artwork without depending on platform-specific Qt rasterisation.
 
-[Unreleased]: https://github.com/frodo4fingers/mangame/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/frodo4fingers/mangame/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/frodo4fingers/mangame/releases/tag/v0.2.0
 [0.1.0]: https://github.com/frodo4fingers/mangame/releases/tag/v0.1.0
