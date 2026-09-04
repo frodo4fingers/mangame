@@ -13,11 +13,11 @@ terms published by each project remain authoritative.
 | [httpcore](https://pypi.org/project/httpcore/1.0.9/) | 1.0.9 | BSD-3-Clause |
 | [httpx](https://pypi.org/project/httpx/0.28.1/) | 0.28.1 | BSD-3-Clause |
 | [idna](https://pypi.org/project/idna/3.19/) | 3.19 | BSD-3-Clause |
-| [platformdirs](https://pypi.org/project/platformdirs/4.11.3/) | 4.11.3 | MIT |
-| [pydantic](https://pypi.org/project/pydantic/2.13.4/) | 2.13.4 | MIT |
-| [pydantic_core](https://pypi.org/project/pydantic_core/2.46.4/) | 2.46.4 | MIT |
-| [PySide6_Essentials](https://pypi.org/project/PySide6_Essentials/6.11.1/) | 6.11.1 | LGPL-3.0-only OR GPL-2.0-only OR GPL-3.0-only |
-| [shiboken6](https://pypi.org/project/shiboken6/6.11.1/) | 6.11.1 | LGPL-3.0-only OR GPL-2.0-only OR GPL-3.0-only |
+| [platformdirs](https://pypi.org/project/platformdirs/4.11.5/) | 4.11.5 | MIT |
+| [pydantic](https://pypi.org/project/pydantic/2.13.5/) | 2.13.5 | MIT |
+| [pydantic_core](https://pypi.org/project/pydantic_core/2.46.5/) | 2.46.5 | MIT |
+| [PySide6_Essentials](https://pypi.org/project/PySide6_Essentials/6.11.2/) | 6.11.2 | LGPL-3.0-only OR GPL-2.0-only OR GPL-3.0-only |
+| [shiboken6](https://pypi.org/project/shiboken6/6.11.2/) | 6.11.2 | LGPL-3.0-only OR GPL-2.0-only OR GPL-3.0-only |
 | [typing_extensions](https://pypi.org/project/typing_extensions/4.16.0/) | 4.16.0 | PSF-2.0 |
 | [typing-inspection](https://pypi.org/project/typing-inspection/0.4.4/) | 0.4.4 | MIT |
 
