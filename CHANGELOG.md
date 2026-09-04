@@ -6,6 +6,15 @@ uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- Cadence learning no longer counts the same chapter twice when more than one
+  source carries it. A mirror that relists a chapter days after the official
+  release used to be read as a release of its own, which both invented an
+  interval between a chapter and itself and made the gap to the genuinely next
+  chapter look short. A fortnightly series tracked on two such sources settled
+  on a three-day period and stopped learning its release weekday entirely.
+
 ## [0.1.0]
 
 First release.

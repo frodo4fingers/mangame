@@ -43,6 +43,30 @@ class TestReleaseEvents:
         history = [chapter(None, START), chapter(None, START + timedelta(days=7))]
         assert len(cadence_rules.release_events(history)) == 2
 
+    def test_the_same_chapter_from_two_sources_is_one_release(self) -> None:
+        # The real One Piece shape: MANGA Plus publishes, MangaDex relists the
+        # very same chapter three days later. Two sightings, one release.
+        history = [
+            chapter("1189", START, source_id="mangaplus"),
+            chapter("1189", START + timedelta(days=3), source_id="mangadex"),
+        ]
+        events = cadence_rules.release_events(history)
+
+        assert len(events) == 1
+        assert events[0].at == START, "a chapter is released when it first appears anywhere"
+
+    def test_a_lagging_mirror_does_not_shorten_the_next_gap(self) -> None:
+        # The subtler half of the same bug: the late copy also sits between
+        # its own chapter and the next one, making that interval look short.
+        history = [
+            chapter("1189", START, source_id="mangaplus"),
+            chapter("1189", START + timedelta(days=3), source_id="mangadex"),
+            chapter("1190", START + timedelta(days=14), source_id="mangaplus"),
+        ]
+        events = cadence_rules.release_events(history)
+
+        assert cadence_rules._intervals(events) == [timedelta(days=14)]
+
     def test_release_times_returns_plain_moments(self) -> None:
         assert cadence_rules.release_times(weekly(3, start=START)) == [
             START,
@@ -104,6 +128,38 @@ class TestEstimate:
         assert cadence.period == timedelta(days=11)
         assert not cadence.is_known, "one sample must not drive tight polling"
         assert cadence.score == 0.0
+
+    def test_a_mirror_that_always_lags_does_not_move_the_rhythm(self) -> None:
+        # Adding a second source must not change what the series' rhythm *is*.
+        # Before duplicate chapters were collapsed, this mirror pulled the
+        # fortnightly period down to 11 days, and because 11 is not a multiple
+        # of a week the weekday and hour stopped being learned at all — so the
+        # tray predicted the wrong day as well as the wrong date.
+        official = weekly(6, start=START, step=timedelta(days=14), source_id="mangaplus")
+        mirror = [
+            chapter(c.number, c.published_at + timedelta(days=3), source_id="mangadex")
+            for c in official
+        ]
+
+        cadence = cadence_rules.estimate(official + mirror)
+
+        assert cadence.period == timedelta(days=14)
+        assert cadence.weekday == START.weekday()
+        assert cadence.hour == 15
+
+    def test_a_second_source_only_makes_the_estimate_more_confident(self) -> None:
+        official = weekly(6, start=START, source_id="mangaplus")
+        mirror = [
+            chapter(c.number, c.published_at + timedelta(minutes=20), source_id="mangadex")
+            for c in official
+        ]
+
+        alone = cadence_rules.estimate(official)
+        mirrored = cadence_rules.estimate(official + mirror)
+
+        assert mirrored.period == alone.period
+        assert mirrored.jitter == alone.jitter, "a duplicate must not look like irregularity"
+        assert mirrored.sample_size == alone.sample_size
 
     def test_omake_only_coverage_yields_no_cadence(self) -> None:
         # MangaDex carries only the ".5" side chapters for some licensed series.

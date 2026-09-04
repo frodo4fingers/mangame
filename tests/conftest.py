@@ -33,9 +33,15 @@ def chapter(
     )
 
 
-def weekly(count: int, *, start: datetime, step: timedelta = timedelta(days=7)) -> list[Chapter]:
+def weekly(
+    count: int,
+    *,
+    start: datetime,
+    step: timedelta = timedelta(days=7),
+    source_id: str = "test",
+) -> list[Chapter]:
     """``count`` chapters numbered 1..count, one every ``step``."""
-    return [chapter(str(i + 1), start + step * i) for i in range(count)]
+    return [chapter(str(i + 1), start + step * i, source_id=source_id) for i in range(count)]
 
 
 @pytest.fixture
