@@ -103,16 +103,58 @@ class Settings(BaseModel):
         return self.model_copy(update={"series": [s for s in self.series if s.key != key]})
 
 
+#: The series mangame ships already following.
+#:
+#: An empty tracker is a chicken-and-egg problem: the icon has nothing to say,
+#: the three states cannot be told apart, and the first thing a new user sees
+#: is an empty list asking them to know what to type. So the first run comes up
+#: following the series this app ships artwork for.
+#:
+#: It is a starting point, not a fixture. Dropping it is saved like any other
+#: change and it does not come back; everything else is found through search.
+DEFAULT_SERIES_TITLE = "One Piece"
+
+
+def default_series() -> list[SeriesConfig]:
+    """The library a brand-new installation starts with.
+
+    Built fresh on every call because a mutable default shared between two
+    ``Settings`` objects would let one library edit the other.
+
+    Sources are listed for every reading language and filtered later by what
+    each one can actually serve, so a Spanish reader gets the same entry with
+    the German scanlation simply never asked.
+    """
+    return [
+        SeriesConfig(
+            key=series_key(DEFAULT_SERIES_TITLE),
+            title=DEFAULT_SERIES_TITLE,
+            emblem="onepiece",
+            sources={
+                "mangadex": "a1c7c817-4e59-43b7-9365-09675a149a6f",
+                "anilist": "30013",
+                "onepiecetube": "https://onepiece.tube/manga/kapitel-mangaliste",
+            },
+        )
+    ]
+
+
 def load(path: Path | None = None) -> Settings:
-    """Read settings, falling back to defaults on a missing or broken file."""
+    """Read settings, falling back to a first-run library.
+
+    A missing file and an unreadable one are the same situation: there is no
+    usable record of what the user follows. Both start from the default
+    library rather than from an empty one, so the tray always has something to
+    draw and a broken file never presents itself as "you track nothing".
+    """
     target = path or paths.config_file()
     if not target.exists():
-        return Settings()
+        return Settings(series=default_series())
     try:
         return Settings.model_validate_json(target.read_text(encoding="utf-8"))
     except (ValidationError, json.JSONDecodeError, OSError):
         # A corrupted config must never stop the tray from coming up.
-        return Settings()
+        return Settings(series=default_series())
 
 
 def save(settings: Settings, path: Path | None = None) -> None:

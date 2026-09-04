@@ -8,6 +8,11 @@ uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- A first run now starts already following One Piece, with the emblem the app
+  ships artwork for. An empty tracker could not demonstrate what the three
+  icon states mean, and asked a new user to know what to search for before
+  seeing anything work. Removing it is remembered like any other change, and
+  every other series is still found through search.
 - An OnePiece-Tube source for German readers. The official simulpub decides
   when a chapter is *scheduled*, but a fan translation often decides when one
   is first *readable*, and a tracker that only asks the publisher will show

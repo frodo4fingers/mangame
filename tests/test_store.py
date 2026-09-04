@@ -217,12 +217,53 @@ class TestSettings:
     def test_a_missing_file_yields_usable_defaults(self, tmp_path: Path) -> None:
         loaded = config_store.load(tmp_path / "absent.json")
         assert loaded.language == "en"
-        assert loaded.series == []
+        assert [s.title for s in loaded.series] == ["One Piece"]
 
     def test_a_corrupt_file_does_not_stop_the_app_starting(self, tmp_path: Path) -> None:
         path = tmp_path / "config.json"
         path.write_text("{not json at all", encoding="utf-8")
+        assert [s.title for s in config_store.load(path).series] == ["One Piece"]
+
+    def test_dropping_the_default_series_is_remembered(self, tmp_path: Path) -> None:
+        # The seed is a starting point, not a fixture: an empty library that
+        # the user chose has to survive a restart.
+        path = tmp_path / "config.json"
+        emptied = config_store.load(path).without_series("one-piece")
+        config_store.save(emptied, path)
+
         assert config_store.load(path).series == []
+
+    def test_a_blank_settings_object_is_not_a_first_run(self) -> None:
+        # Only loading with no usable file seeds the library; constructing
+        # settings in code must not conjure a series out of nowhere.
+        assert config_store.Settings().series == []
+
+    def test_each_load_gets_its_own_series_objects(self, tmp_path: Path) -> None:
+        first = config_store.load(tmp_path / "absent.json")
+        second = config_store.load(tmp_path / "absent.json")
+        first.series[0].title = "edited"
+
+        assert second.series[0].title == "One Piece"
+
+    def test_the_default_series_only_names_sources_that_exist(self) -> None:
+        from mangame.sources.registry import SourceRegistry
+
+        registry = SourceRegistry()
+        for series in config_store.default_series():
+            for source_id in series.sources:
+                assert registry.get(source_id) is not None, source_id
+
+    def test_the_default_series_wears_artwork_that_ships(self) -> None:
+        # Not merely an emblem available on this machine: a first run on a
+        # clean install has no imported artwork, and an emblem that is not in
+        # the wheel would quietly degrade to a monogram.
+        from mangame.domain.models import IconState
+        from mangame.ui.emblems import BUNDLED_DIR
+
+        for series in config_store.default_series():
+            for state in IconState:
+                shipped = BUNDLED_DIR / series.emblem / f"{state.value}.png"
+                assert shipped.is_file(), shipped
 
     def test_saving_is_atomic(self, tmp_path: Path) -> None:
         path = tmp_path / "config.json"
