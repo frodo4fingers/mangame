@@ -54,12 +54,18 @@ Two things the operating system will ask about:
   `~/.local/share/applications/` and `mangame.png` into
   `~/.local/share/icons/hicolor/512x512/apps/`.
 
-### Install from PyPI
+### Install with uv or pipx
+
+mangame is not on PyPI yet, so install it from the repository — this builds the
+same package the releases are cut from:
 
 ```bash
-uv tool install mangame   # or: pipx install mangame
+uv tool install git+https://github.com/frodo4fingers/mangame
 mangame
 ```
+
+`pipx install git+https://github.com/frodo4fingers/mangame` does the same.
+Append `@v0.2.0` to either URL to pin a release instead of tracking `main`.
 
 ### Run from source
 

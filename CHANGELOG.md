@@ -6,6 +6,14 @@ uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- The README no longer offers a PyPI install that cannot work. `mangame` has
+  never been published to PyPI, so `uv tool install mangame` resolved to
+  nothing and the first instruction a reader followed was the first one that
+  failed. It now installs from the repository, which builds the same package
+  the releases are cut from, and says how to pin a tag.
+
 ## [0.2.0]
 
 The `v0.2.0` tag is unsigned because tag signing is still not configured for
