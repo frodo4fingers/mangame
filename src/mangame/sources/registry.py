@@ -14,12 +14,14 @@ from mangame.sources import anilist, mangadex, mangaupdates
 from mangame.sources.base import Capabilities, Source
 from mangame.sources.feed import FeedSource
 from mangame.sources.http import HttpClient
+from mangame.sources.onepiecetube import OnePieceTubeSource
 
 #: Adapter id -> (adapter, requests per second, burst).
 _BUILTINS: tuple[tuple[Source, float, int], ...] = (
     (mangadex.MangaDexSource(), mangadex.RATE_PER_SECOND, 4),
     (mangaupdates.MangaUpdatesSource(), mangaupdates.RATE_PER_SECOND, 2),
     (anilist.AniListSource(), anilist.RATE_PER_SECOND, 2),
+    (OnePieceTubeSource(), 0.5, 1),
     (FeedSource(), 1.0, 4),
 )
 

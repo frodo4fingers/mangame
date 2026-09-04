@@ -6,6 +6,15 @@ uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- An OnePiece-Tube source for German readers. The official simulpub decides
+  when a chapter is *scheduled*, but a fan translation often decides when one
+  is first *readable*, and a tracker that only asks the publisher will show
+  "expected Sunday" while the chapter is already on screen. Only chapters the
+  site can actually serve are reported, so the icon never turns on for an
+  entry that opens on nothing.
+
 ### Fixed
 
 - Cadence learning no longer counts the same chapter twice when more than one
