@@ -78,21 +78,55 @@ def _as_utc(moment: datetime) -> datetime:
     return moment.astimezone(UTC) if moment.tzinfo else moment.replace(tzinfo=UTC)
 
 
+def _first_sightings(
+    stamped: Iterable[tuple[datetime, float | None]],
+) -> list[tuple[datetime, float | None]]:
+    """One moment per chapter number: the first time it was seen anywhere.
+
+    A tracked series usually has several sources, and the same chapter reaches
+    us from each of them minutes or days apart — an official simulpub and a
+    mirror that relists it three days later are one release, not two.
+
+    Left alone the later copies are poison, in two directions at once. The copy
+    becomes a release that advances no chapter, so the gap between a chapter
+    and *itself* is measured as a real interval; and the gap from that copy to
+    the genuinely next chapter is measured short by however long the mirror
+    lagged. Both feed straight into the median this module is built on.
+    """
+    earliest: dict[float, datetime] = {}
+    unnumbered: list[tuple[datetime, float | None]] = []
+
+    for moment, number in stamped:
+        if number is None:
+            # Nothing identifies these, so they cannot be recognised as copies.
+            unnumbered.append((moment, None))
+        elif number not in earliest or moment < earliest[number]:
+            earliest[number] = moment
+
+    numbered = [(moment, number) for number, moment in earliest.items()]
+    return sorted(
+        numbered + unnumbered,
+        key=lambda pair: (pair[0], pair[1] if pair[1] is not None else float("-inf")),
+    )
+
+
 def release_events(chapters: Iterable[Chapter]) -> list[Release]:
     """Collapse chapters into distinct release moments, oldest first.
 
-    Two kinds of noise are removed here, because everything downstream
+    Three kinds of noise are removed here, because everything downstream
     (cadence, expected-next, break detection, poll pacing) reads this list:
 
     * multi-chapter dumps, common on aggregators and catch-up scanlations,
       would otherwise look like a several-times-a-day cadence;
-    * late backfills of old chapters would otherwise look like fresh releases.
+    * late backfills of old chapters would otherwise look like fresh releases;
+    * the same chapter arriving from several sources would otherwise look like
+      a release that advanced nothing — see :func:`_first_sightings`.
 
     Each event carries the highest chapter number in its batch, so callers can
     tell "one chapter later" from "forty-one chapters later".
     """
     ordered = _forward_run(list(chapters))
-    stamped = sorted((_as_utc(c.published_at), _numeric(c)) for c in ordered)
+    stamped = _first_sightings((_as_utc(c.published_at), _numeric(c)) for c in ordered)
 
     events: list[Release] = []
     for moment, number in stamped:

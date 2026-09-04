@@ -6,6 +6,29 @@ uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- A first run now starts already following One Piece, with the emblem the app
+  ships artwork for. An empty tracker could not demonstrate what the three
+  icon states mean, and asked a new user to know what to search for before
+  seeing anything work. Removing it is remembered like any other change, and
+  every other series is still found through search.
+- An OnePiece-Tube source for German readers. The official simulpub decides
+  when a chapter is *scheduled*, but a fan translation often decides when one
+  is first *readable*, and a tracker that only asks the publisher will show
+  "expected Sunday" while the chapter is already on screen. Only chapters the
+  site can actually serve are reported, so the icon never turns on for an
+  entry that opens on nothing.
+
+### Fixed
+
+- Cadence learning no longer counts the same chapter twice when more than one
+  source carries it. A mirror that relists a chapter days after the official
+  release used to be read as a release of its own, which both invented an
+  interval between a chapter and itself and made the gap to the genuinely next
+  chapter look short. A fortnightly series tracked on two such sources settled
+  on a three-day period and stopped learning its release weekday entirely.
+
 ## [0.1.0]
 
 First release.
