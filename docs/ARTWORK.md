@@ -19,6 +19,9 @@ emblems/hunter-x-hunter/due.png
 emblems/hunter-x-hunter/break.png
 ```
 
+So a drop-in is `emblems/<manga>.png`, and the set derived from it is
+`emblems/<manga>/<ready|due|break>.png` — one file per icon state.
+
 The source PNG remains at the root. Replacing it regenerates the three files;
 removing the emblem in Settings removes both source and generated output.
 
